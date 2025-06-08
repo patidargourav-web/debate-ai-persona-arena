@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -22,6 +23,7 @@ export const VideoInterface = ({ isDebating, onEndDebate }: VideoInterfaceProps)
   const videoRef = useRef<HTMLVideoElement>(null);
   const aiVideoRef = useRef<HTMLIFrameElement>(null);
   const recognitionRef = useRef<any>(null);
+  const conversationCleanupRef = useRef<string | null>(null);
 
   const TAVUS_API_KEY = 'ce3813432eaa4955b4453267bab295b2';
   const PERSONA_ID = 'p8494ff3054c';
@@ -41,10 +43,37 @@ export const VideoInterface = ({ isDebating, onEndDebate }: VideoInterfaceProps)
       initializeAIPersona();
     }
     return () => {
-      stopCamera();
-      stopSpeechRecognition();
+      cleanup();
     };
   }, [isDebating]);
+
+  const cleanup = async () => {
+    stopCamera();
+    stopSpeechRecognition();
+    
+    // Clean up any active conversation
+    if (conversationCleanupRef.current) {
+      try {
+        await endConversation(conversationCleanupRef.current);
+      } catch (error) {
+        console.error('Error cleaning up conversation:', error);
+      }
+    }
+  };
+
+  const endConversation = async (conversationId: string) => {
+    try {
+      const options = {
+        method: 'DELETE',
+        headers: {'x-api-key': TAVUS_API_KEY}
+      };
+      
+      await fetch(`https://tavusapi.com/v2/conversations/${conversationId}`, options);
+      console.log('Conversation ended successfully');
+    } catch (error) {
+      console.error('Error ending conversation:', error);
+    }
+  };
 
   const getPersona = async () => {
     setLoading(true);
@@ -60,7 +89,7 @@ export const VideoInterface = ({ isDebating, onEndDebate }: VideoInterfaceProps)
       const data = await response.json();
       
       if (!response.ok) {
-        throw new Error(data.error || 'Failed to load persona');
+        throw new Error(data.error || data.message || 'Failed to load persona');
       }
       
       setPersona(data);
@@ -76,7 +105,7 @@ export const VideoInterface = ({ isDebating, onEndDebate }: VideoInterfaceProps)
     }
   };
 
-  const createConversation = async () => {
+  const createConversation = async (retryCount = 0) => {
     setLoading(true);
     setError(null);
     
@@ -101,16 +130,29 @@ export const VideoInterface = ({ isDebating, onEndDebate }: VideoInterfaceProps)
       const data = await response.json();
       
       if (!response.ok) {
+        if (data.message?.includes('maximum concurrent conversations') && retryCount < 2) {
+          console.log('Max conversations reached, waiting and retrying...');
+          await new Promise(resolve => setTimeout(resolve, 3000));
+          return createConversation(retryCount + 1);
+        }
         throw new Error(data.message || 'Failed to create conversation');
       }
       
       setConversation(data);
+      conversationCleanupRef.current = data.conversation_id;
       console.log('Conversation created:', data);
       return data;
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to create conversation';
       setError(errorMessage);
       console.error('Error creating conversation:', err);
+      
+      if (retryCount === 0 && errorMessage.includes('maximum concurrent conversations')) {
+        console.log('Retrying conversation creation...');
+        await new Promise(resolve => setTimeout(resolve, 2000));
+        return createConversation(1);
+      }
+      
       throw err;
     } finally {
       setLoading(false);
@@ -159,13 +201,20 @@ export const VideoInterface = ({ isDebating, onEndDebate }: VideoInterfaceProps)
   const initializeAIPersona = async () => {
     try {
       console.log('Initializing AI persona...');
+      setError(null);
+      
       await getPersona();
       const conversationData = await createConversation();
       
       if (conversationData?.conversation_url && aiVideoRef.current) {
-        aiVideoRef.current.src = conversationData.conversation_url;
-        setAiPersonaReady(true);
-        console.log('AI persona ready for debate');
+        // Add a delay to ensure the conversation is fully ready
+        setTimeout(() => {
+          if (aiVideoRef.current) {
+            aiVideoRef.current.src = conversationData.conversation_url;
+            setAiPersonaReady(true);
+            console.log('AI persona ready for debate');
+          }
+        }, 2000);
       }
       
       // Start user camera and speech recognition
@@ -173,6 +222,7 @@ export const VideoInterface = ({ isDebating, onEndDebate }: VideoInterfaceProps)
       initializeSpeechRecognition();
     } catch (error) {
       console.error('Failed to initialize AI persona:', error);
+      setError('Failed to initialize AI persona. Using fallback mode.');
     }
   };
 
@@ -184,6 +234,7 @@ export const VideoInterface = ({ isDebating, onEndDebate }: VideoInterfaceProps)
       }
     } catch (error) {
       console.error('Error accessing camera:', error);
+      setError('Camera access denied. Please enable camera permissions.');
     }
   };
 
@@ -212,6 +263,10 @@ export const VideoInterface = ({ isDebating, onEndDebate }: VideoInterfaceProps)
           setTranscript(finalTranscript);
           handleUserSpeech(finalTranscript);
         }
+      };
+
+      recognitionRef.current.onerror = (event: any) => {
+        console.error('Speech recognition error:', event.error);
       };
     }
   };
@@ -268,7 +323,17 @@ export const VideoInterface = ({ isDebating, onEndDebate }: VideoInterfaceProps)
     return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   };
 
-  const handleEndDebate = () => {
+  const handleEndDebate = async () => {
+    // Clean up conversation before ending
+    if (conversationCleanupRef.current) {
+      try {
+        await endConversation(conversationCleanupRef.current);
+        conversationCleanupRef.current = null;
+      } catch (error) {
+        console.error('Error ending conversation:', error);
+      }
+    }
+
     const results = {
       duration: debateTimer,
       transcript: transcript,
@@ -291,7 +356,7 @@ export const VideoInterface = ({ isDebating, onEndDebate }: VideoInterfaceProps)
           <h2 className="text-xl font-semibold">Debate Session</h2>
           <p className="text-sm text-slate-400">
             Topic: Climate Change Solutions
-            {error && <span className="text-red-400 ml-2">• AI Error: {error}</span>}
+            {error && <span className="text-red-400 ml-2">• {error}</span>}
             {loading && <span className="text-yellow-400 ml-2">• Loading AI...</span>}
             {aiPersonaReady && <span className="text-green-400 ml-2">• AI Ready</span>}
           </p>
@@ -305,7 +370,7 @@ export const VideoInterface = ({ isDebating, onEndDebate }: VideoInterfaceProps)
       <div className="flex-1 grid grid-cols-2 gap-4 p-4">
         {/* AI Persona */}
         <Card className="bg-slate-800/50 backdrop-blur-sm border-blue-500/30 p-4 flex flex-col">
-          <h3 className="text-white font-semibold mb-2">AI Persona - Alex</h3>
+          <h3 className="text-white font-semibold mb-2">AI Persona - Debatrix</h3>
           <div className="flex-1 rounded-lg overflow-hidden relative">
             {aiPersonaReady && conversation?.conversation_url ? (
               <iframe
@@ -322,7 +387,7 @@ export const VideoInterface = ({ isDebating, onEndDebate }: VideoInterfaceProps)
                     🤖
                   </div>
                   <p className="text-white text-sm">
-                    {loading ? 'Loading AI Persona...' : 'AI Persona Initializing...'}
+                    {loading ? 'Loading AI Persona...' : error ? 'AI in fallback mode' : 'AI Persona Initializing...'}
                   </p>
                 </div>
               </div>
