@@ -20,6 +20,7 @@ export const VideoInterface = ({ isDebating, onEndDebate }: VideoInterfaceProps)
   const [conversation, setConversation] = useState<any>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [iframeLoaded, setIframeLoaded] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
   const aiVideoRef = useRef<HTMLIFrameElement>(null);
   const recognitionRef = useRef<any>(null);
@@ -202,19 +203,21 @@ export const VideoInterface = ({ isDebating, onEndDebate }: VideoInterfaceProps)
     try {
       console.log('Initializing AI persona...');
       setError(null);
+      setIframeLoaded(false);
       
       await getPersona();
       const conversationData = await createConversation();
       
       if (conversationData?.conversation_url && aiVideoRef.current) {
-        // Add a delay to ensure the conversation is fully ready
+        console.log('Setting iframe src:', conversationData.conversation_url);
+        // Set the iframe src immediately
+        aiVideoRef.current.src = conversationData.conversation_url;
+        
+        // Set ready state after a delay to allow iframe to load
         setTimeout(() => {
-          if (aiVideoRef.current) {
-            aiVideoRef.current.src = conversationData.conversation_url;
-            setAiPersonaReady(true);
-            console.log('AI persona ready for debate');
-          }
-        }, 2000);
+          setAiPersonaReady(true);
+          console.log('AI persona ready for debate');
+        }, 3000);
       }
       
       // Start user camera and speech recognition
@@ -224,6 +227,17 @@ export const VideoInterface = ({ isDebating, onEndDebate }: VideoInterfaceProps)
       console.error('Failed to initialize AI persona:', error);
       setError('Failed to initialize AI persona. Using fallback mode.');
     }
+  };
+
+  const handleIframeLoad = () => {
+    console.log('Iframe loaded successfully');
+    setIframeLoaded(true);
+    setError(null);
+  };
+
+  const handleIframeError = () => {
+    console.error('Iframe failed to load');
+    setError('Failed to load AI video. Check connection.');
   };
 
   const startCamera = async () => {
@@ -359,6 +373,7 @@ export const VideoInterface = ({ isDebating, onEndDebate }: VideoInterfaceProps)
             {error && <span className="text-red-400 ml-2">• {error}</span>}
             {loading && <span className="text-yellow-400 ml-2">• Loading AI...</span>}
             {aiPersonaReady && <span className="text-green-400 ml-2">• AI Ready</span>}
+            {conversation && !aiPersonaReady && <span className="text-blue-400 ml-2">• Connecting to AI...</span>}
           </p>
         </div>
         <div className="text-white text-lg font-mono">
@@ -371,15 +386,28 @@ export const VideoInterface = ({ isDebating, onEndDebate }: VideoInterfaceProps)
         {/* AI Persona */}
         <Card className="bg-slate-800/50 backdrop-blur-sm border-blue-500/30 p-4 flex flex-col">
           <h3 className="text-white font-semibold mb-2">AI Persona - Debatrix</h3>
-          <div className="flex-1 rounded-lg overflow-hidden relative">
-            {aiPersonaReady && conversation?.conversation_url ? (
-              <iframe
-                ref={aiVideoRef}
-                src={conversation.conversation_url}
-                className="w-full h-full rounded-lg"
-                allow="camera; microphone"
-                title="AI Debate Persona"
-              />
+          <div className="flex-1 rounded-lg overflow-hidden relative bg-slate-900/50">
+            {conversation?.conversation_url ? (
+              <>
+                <iframe
+                  ref={aiVideoRef}
+                  src={conversation.conversation_url}
+                  className="w-full h-full rounded-lg border-0"
+                  allow="camera; microphone; autoplay; display-capture; fullscreen"
+                  title="AI Debate Persona"
+                  onLoad={handleIframeLoad}
+                  onError={handleIframeError}
+                  style={{ minHeight: '400px' }}
+                />
+                {!iframeLoaded && (
+                  <div className="absolute inset-0 bg-slate-900/80 backdrop-blur-sm rounded-lg flex items-center justify-center">
+                    <div className="text-center">
+                      <div className="w-16 h-16 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+                      <p className="text-white text-sm">Loading AI Video...</p>
+                    </div>
+                  </div>
+                )}
+              </>
             ) : (
               <div className="w-full h-full bg-gradient-to-br from-blue-600/20 to-purple-600/20 rounded-lg flex items-center justify-center">
                 <div className="text-center">
@@ -387,8 +415,11 @@ export const VideoInterface = ({ isDebating, onEndDebate }: VideoInterfaceProps)
                     🤖
                   </div>
                   <p className="text-white text-sm">
-                    {loading ? 'Loading AI Persona...' : error ? 'AI in fallback mode' : 'AI Persona Initializing...'}
+                    {loading ? 'Initializing AI Persona...' : error ? 'AI in fallback mode' : 'AI Persona Starting...'}
                   </p>
+                  {loading && (
+                    <div className="w-8 h-8 border-2 border-white border-t-transparent rounded-full animate-spin mx-auto mt-2"></div>
+                  )}
                 </div>
               </div>
             )}
