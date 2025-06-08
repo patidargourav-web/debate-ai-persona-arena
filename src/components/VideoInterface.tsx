@@ -1,9 +1,7 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Mic, MicOff, Video, VideoOff } from 'lucide-react';
-import { useTavusPersona } from '@/hooks/useTavusPersona';
 
 interface VideoInterfaceProps {
   isDebating: boolean;
@@ -17,19 +15,16 @@ export const VideoInterface = ({ isDebating, onEndDebate }: VideoInterfaceProps)
   const [transcript, setTranscript] = useState('');
   const [debateTimer, setDebateTimer] = useState(0);
   const [aiPersonaReady, setAiPersonaReady] = useState(false);
+  const [persona, setPersona] = useState<any>(null);
+  const [conversation, setConversation] = useState<any>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const aiVideoRef = useRef<HTMLIFrameElement>(null);
   const recognitionRef = useRef<any>(null);
 
-  const { 
-    persona, 
-    conversation, 
-    loading: tavusLoading, 
-    error: tavusError, 
-    getPersona, 
-    createConversation, 
-    sendMessage 
-  } = useTavusPersona();
+  const TAVUS_API_KEY = 'ce3813432eaa4955b4453267bab295b2';
+  const PERSONA_ID = 'p8494ff3054c';
 
   useEffect(() => {
     let interval: NodeJS.Timeout;
@@ -50,6 +45,116 @@ export const VideoInterface = ({ isDebating, onEndDebate }: VideoInterfaceProps)
       stopSpeechRecognition();
     };
   }, [isDebating]);
+
+  const getPersona = async () => {
+    setLoading(true);
+    setError(null);
+    
+    try {
+      const options = {
+        method: 'GET', 
+        headers: {'x-api-key': TAVUS_API_KEY}
+      };
+      
+      const response = await fetch(`https://tavusapi.com/v2/personas/${PERSONA_ID}`, options);
+      const data = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to load persona');
+      }
+      
+      setPersona(data);
+      console.log('Persona loaded:', data);
+      return data;
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to load persona';
+      setError(errorMessage);
+      console.error('Error loading persona:', err);
+      throw err;
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const createConversation = async () => {
+    setLoading(true);
+    setError(null);
+    
+    try {
+      const options = {
+        method: 'POST',
+        headers: {
+          'x-api-key': TAVUS_API_KEY,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          persona_id: PERSONA_ID,
+          callback_url: `${window.location.origin}/api/tavus-callback`,
+          properties: {
+            max_call_duration: 600,
+            participant_left_timeout: 30,
+          }
+        })
+      };
+      
+      const response = await fetch('https://tavusapi.com/v2/conversations', options);
+      const data = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(data.message || 'Failed to create conversation');
+      }
+      
+      setConversation(data);
+      console.log('Conversation created:', data);
+      return data;
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to create conversation';
+      setError(errorMessage);
+      console.error('Error creating conversation:', err);
+      throw err;
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const sendMessage = async (message: string) => {
+    if (!conversation?.conversation_id) {
+      throw new Error('No active conversation');
+    }
+
+    setLoading(true);
+    setError(null);
+    
+    try {
+      const options = {
+        method: 'POST',
+        headers: {
+          'x-api-key': TAVUS_API_KEY,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          text: message,
+        })
+      };
+      
+      const response = await fetch(`https://tavusapi.com/v2/conversations/${conversation.conversation_id}/speak`, options);
+      const data = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(data.message || 'Failed to send message');
+      }
+      
+      console.log('Message sent to AI:', data);
+      return data;
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to send message';
+      setError(errorMessage);
+      console.error('Error sending message:', err);
+      throw err;
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const initializeAIPersona = async () => {
     try {
@@ -186,8 +291,8 @@ export const VideoInterface = ({ isDebating, onEndDebate }: VideoInterfaceProps)
           <h2 className="text-xl font-semibold">Debate Session</h2>
           <p className="text-sm text-slate-400">
             Topic: Climate Change Solutions
-            {tavusError && <span className="text-red-400 ml-2">• AI Error: {tavusError}</span>}
-            {tavusLoading && <span className="text-yellow-400 ml-2">• Loading AI...</span>}
+            {error && <span className="text-red-400 ml-2">• AI Error: {error}</span>}
+            {loading && <span className="text-yellow-400 ml-2">• Loading AI...</span>}
             {aiPersonaReady && <span className="text-green-400 ml-2">• AI Ready</span>}
           </p>
         </div>
@@ -217,7 +322,7 @@ export const VideoInterface = ({ isDebating, onEndDebate }: VideoInterfaceProps)
                     🤖
                   </div>
                   <p className="text-white text-sm">
-                    {tavusLoading ? 'Loading AI Persona...' : 'AI Persona Initializing...'}
+                    {loading ? 'Loading AI Persona...' : 'AI Persona Initializing...'}
                   </p>
                 </div>
               </div>
