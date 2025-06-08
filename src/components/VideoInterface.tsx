@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -21,7 +20,6 @@ export const VideoInterface = ({ isDebating, onEndDebate }: VideoInterfaceProps)
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [iframeLoaded, setIframeLoaded] = useState(false);
-  const videoRef = useRef<HTMLVideoElement>(null);
   const aiVideoRef = useRef<HTMLIFrameElement>(null);
   const recognitionRef = useRef<any>(null);
   const conversationCleanupRef = useRef<string | null>(null);
@@ -49,7 +47,6 @@ export const VideoInterface = ({ isDebating, onEndDebate }: VideoInterfaceProps)
   }, [isDebating]);
 
   const cleanup = async () => {
-    stopCamera();
     stopSpeechRecognition();
     
     // Clean up any active conversation
@@ -220,8 +217,7 @@ export const VideoInterface = ({ isDebating, onEndDebate }: VideoInterfaceProps)
         }, 3000);
       }
       
-      // Start user camera and speech recognition
-      startCamera();
+      // Start speech recognition
       initializeSpeechRecognition();
     } catch (error) {
       console.error('Failed to initialize AI persona:', error);
@@ -238,25 +234,6 @@ export const VideoInterface = ({ isDebating, onEndDebate }: VideoInterfaceProps)
   const handleIframeError = () => {
     console.error('Iframe failed to load');
     setError('Failed to load AI video. Check connection.');
-  };
-
-  const startCamera = async () => {
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-      }
-    } catch (error) {
-      console.error('Error accessing camera:', error);
-      setError('Camera access denied. Please enable camera permissions.');
-    }
-  };
-
-  const stopCamera = () => {
-    if (videoRef.current && videoRef.current.srcObject) {
-      const tracks = (videoRef.current.srcObject as MediaStream).getTracks();
-      tracks.forEach(track => track.stop());
-    }
   };
 
   const initializeSpeechRecognition = () => {
@@ -381,12 +358,11 @@ export const VideoInterface = ({ isDebating, onEndDebate }: VideoInterfaceProps)
         </div>
       </div>
 
-      {/* Video Area */}
-      <div className="flex-1 grid grid-cols-2 gap-4 p-4">
-        {/* AI Persona */}
-        <Card className="bg-slate-800/50 backdrop-blur-sm border-blue-500/30 p-4 flex flex-col">
-          <h3 className="text-white font-semibold mb-2">AI Persona - Debatrix</h3>
-          <div className="flex-1 rounded-lg overflow-hidden relative bg-slate-900/50">
+      {/* Single AI Video Area */}
+      <div className="flex-1 p-8 flex justify-center items-center">
+        <Card className="bg-slate-800/50 backdrop-blur-sm border-blue-500/30 p-6 w-full max-w-4xl">
+          <h3 className="text-white font-semibold mb-4 text-center text-xl">AI Debate Persona - Debatrix</h3>
+          <div className="rounded-lg overflow-hidden relative bg-slate-900/50" style={{ aspectRatio: '16/9', minHeight: '500px' }}>
             {conversation?.conversation_url ? (
               <>
                 <iframe
@@ -397,7 +373,6 @@ export const VideoInterface = ({ isDebating, onEndDebate }: VideoInterfaceProps)
                   title="AI Debate Persona"
                   onLoad={handleIframeLoad}
                   onError={handleIframeError}
-                  style={{ minHeight: '400px' }}
                 />
                 {!iframeLoaded && (
                   <div className="absolute inset-0 bg-slate-900/80 backdrop-blur-sm rounded-lg flex items-center justify-center">
@@ -414,7 +389,7 @@ export const VideoInterface = ({ isDebating, onEndDebate }: VideoInterfaceProps)
                   <div className="w-32 h-32 bg-gradient-to-br from-blue-500 to-purple-500 rounded-full flex items-center justify-center text-4xl mb-4 mx-auto">
                     🤖
                   </div>
-                  <p className="text-white text-sm">
+                  <p className="text-white text-lg mb-2">
                     {loading ? 'Initializing AI Persona...' : error ? 'AI in fallback mode' : 'AI Persona Starting...'}
                   </p>
                   {loading && (
@@ -423,22 +398,11 @@ export const VideoInterface = ({ isDebating, onEndDebate }: VideoInterfaceProps)
                 </div>
               </div>
             )}
-          </div>
-        </Card>
-
-        {/* User Video */}
-        <Card className="bg-slate-800/50 backdrop-blur-sm border-purple-500/30 p-4 flex flex-col">
-          <h3 className="text-white font-semibold mb-2">You</h3>
-          <div className="flex-1 rounded-lg overflow-hidden relative">
-            <video
-              ref={videoRef}
-              autoPlay
-              muted
-              className="w-full h-full object-cover rounded-lg"
-            />
+            
+            {/* Transcript overlay */}
             {transcript && (
-              <div className="absolute bottom-4 left-4 right-4 bg-slate-900/80 backdrop-blur-sm p-3 rounded-lg">
-                <p className="text-white text-sm">{transcript}</p>
+              <div className="absolute bottom-4 left-4 right-4 bg-slate-900/90 backdrop-blur-sm p-4 rounded-lg">
+                <p className="text-white text-sm"><strong>You said:</strong> {transcript}</p>
               </div>
             )}
           </div>
