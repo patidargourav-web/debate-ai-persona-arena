@@ -9,11 +9,12 @@ import { EnhancedLeaderboard } from '@/components/EnhancedLeaderboard';
 import { EnhancedPostDebateResults } from '@/components/EnhancedPostDebateResults';
 import { Navigation } from '@/components/Navigation';
 import { useAuth } from '@/contexts/AuthContext';
+import { DebateResultsData } from '@/hooks/useDebateResults';
 
 const Index = () => {
   const [currentView, setCurrentView] = useState<'home' | 'debate' | 'results' | 'leaderboard'>('home');
   const [isDebating, setIsDebating] = useState(false);
-  const [debateData, setDebateData] = useState(null);
+  const [debateData, setDebateData] = useState<DebateResultsData | null>(null);
   const [transcript, setTranscript] = useState('');
   const { user, loading } = useAuth();
   const navigate = useNavigate();
@@ -46,7 +47,7 @@ const Index = () => {
     setIsDebating(false);
     
     // Enhanced results with comparison and improvements
-    const enhancedResults = {
+    const enhancedResults: DebateResultsData = {
       ...results,
       comparison: {
         aiScore: Math.floor(Math.random() * 20) + 80, // AI typically scores 80-100

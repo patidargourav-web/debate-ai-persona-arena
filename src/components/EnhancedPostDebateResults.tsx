@@ -1,34 +1,11 @@
-import React from 'react';
+
+import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
-
-interface DebateResultsData {
-  duration: number;
-  transcript: string;
-  score: number;
-  metrics: {
-    argumentStrength: number;
-    clarity: number;
-    engagement: number;
-    fillerWords: number;
-    topicRelevance: number;
-    emotionalTone: string;
-    structure: {
-      hasOpening: boolean;
-      hasArgument: boolean;
-      hasRebuttal: boolean;
-      hasConclusion: boolean;
-    };
-  };
-  comparison: {
-    aiScore: number;
-    averageUserScore: number;
-    percentileRank: number;
-  };
-  improvements: string[];
-}
+import { useDebateResults, DebateResultsData } from '@/hooks/useDebateResults';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface EnhancedPostDebateResultsProps {
   data: DebateResultsData | null;
@@ -41,6 +18,22 @@ export const EnhancedPostDebateResults = ({
   onReturnHome, 
   onStartNewDebate 
 }: EnhancedPostDebateResultsProps) => {
+  const [savedResultId, setSavedResultId] = useState<string | null>(null);
+  const [isShared, setIsShared] = useState(false);
+  const { saveDebateResult, shareDebateResult, isLoading } = useDebateResults();
+  const { user } = useAuth();
+
+  // Auto-save results when component mounts
+  useEffect(() => {
+    if (data && user && !savedResultId) {
+      saveDebateResult(data, 'Climate Change Debate').then((result) => {
+        if (result) {
+          setSavedResultId(result.id);
+        }
+      });
+    }
+  }, [data, user, savedResultId, saveDebateResult]);
+
   if (!data) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-900 via-blue-900 to-slate-900">
@@ -90,6 +83,18 @@ export const EnhancedPostDebateResults = ({
     return "Keep working on your skills! 💪";
   };
 
+  const handleShareResults = async () => {
+    if (!savedResultId) {
+      console.error('No saved result ID available');
+      return;
+    }
+
+    const success = await shareDebateResult(savedResultId);
+    if (success) {
+      setIsShared(true);
+    }
+  };
+
   const structureScore = Object.values(metrics.structure).filter(Boolean).length * 25;
 
   return (
@@ -130,6 +135,11 @@ export const EnhancedPostDebateResults = ({
               <div className="space-y-2">
                 <p className="text-slate-300">Duration: {formatTime(duration)}</p>
                 <p className="text-slate-300">Filler words: {metrics.fillerWords}</p>
+                {savedResultId && (
+                  <Badge className={isShared ? "bg-green-600" : "bg-blue-600"}>
+                    {isShared ? "✓ Shared to Leaderboard" : "Ready to Share"}
+                  </Badge>
+                )}
               </div>
             </CardContent>
           </Card>
@@ -341,12 +351,13 @@ export const EnhancedPostDebateResults = ({
           
           <div className="space-x-4">
             <Button
-              onClick={() => navigator.share?.({ title: 'My Debate Results', text: `I scored ${score}/100 in my debate!` })}
+              onClick={handleShareResults}
+              disabled={!savedResultId || isShared || isLoading}
               variant="outline"
               size="lg"
-              className="border-purple-500 text-purple-400 hover:bg-purple-500 hover:text-white"
+              className="border-purple-500 text-purple-400 hover:bg-purple-500 hover:text-white disabled:opacity-50"
             >
-              📤 Share Results
+              {isLoading ? '⏳ Sharing...' : isShared ? '✓ Shared to Leaderboard' : '📤 Share to Leaderboard'}
             </Button>
             <Button
               onClick={onStartNewDebate}

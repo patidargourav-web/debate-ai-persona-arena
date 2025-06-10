@@ -9,7 +9,126 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
-      [_ in never]: never
+      debate_results: {
+        Row: {
+          comparison: Json
+          created_at: string
+          debate_date: string
+          duration: number
+          id: string
+          improvements: string[]
+          is_shared: boolean
+          metrics: Json
+          score: number
+          topic: string | null
+          user_id: string
+        }
+        Insert: {
+          comparison: Json
+          created_at?: string
+          debate_date?: string
+          duration: number
+          id?: string
+          improvements: string[]
+          is_shared?: boolean
+          metrics: Json
+          score: number
+          topic?: string | null
+          user_id: string
+        }
+        Update: {
+          comparison?: Json
+          created_at?: string
+          debate_date?: string
+          duration?: number
+          id?: string
+          improvements?: string[]
+          is_shared?: boolean
+          metrics?: Json
+          score?: number
+          topic?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
+      leaderboard_entries: {
+        Row: {
+          created_at: string
+          id: string
+          is_online: boolean | null
+          last_debate_date: string | null
+          last_match_score: number | null
+          rank: number | null
+          total_debates: number
+          total_score: number
+          trend: string | null
+          updated_at: string
+          user_id: string
+          username: string
+          win_rate: number
+          wins: number
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_online?: boolean | null
+          last_debate_date?: string | null
+          last_match_score?: number | null
+          rank?: number | null
+          total_debates?: number
+          total_score?: number
+          trend?: string | null
+          updated_at?: string
+          user_id: string
+          username: string
+          win_rate?: number
+          wins?: number
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_online?: boolean | null
+          last_debate_date?: string | null
+          last_match_score?: number | null
+          rank?: number | null
+          total_debates?: number
+          total_score?: number
+          trend?: string | null
+          updated_at?: string
+          user_id?: string
+          username?: string
+          win_rate?: number
+          wins?: number
+        }
+        Relationships: []
+      }
+      profiles: {
+        Row: {
+          avatar_url: string | null
+          created_at: string
+          display_name: string | null
+          id: string
+          updated_at: string
+          username: string | null
+        }
+        Insert: {
+          avatar_url?: string | null
+          created_at?: string
+          display_name?: string | null
+          id: string
+          updated_at?: string
+          username?: string | null
+        }
+        Update: {
+          avatar_url?: string | null
+          created_at?: string
+          display_name?: string | null
+          id?: string
+          updated_at?: string
+          username?: string | null
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
