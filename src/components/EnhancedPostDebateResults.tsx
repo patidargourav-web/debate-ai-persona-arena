@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -159,7 +158,7 @@ export const EnhancedPostDebateResults = ({
                   <div>
                     <div className="flex justify-between text-sm mb-1">
                       <span className="text-slate-300">Clarity & Delivery</span>
-                      <span className={`${getScoreColor(metrics.clarity)} font-medium`}>
+                      <span className={`${getScoreClass(metrics.clarity)} font-medium`}>
                         {metrics.clarity}%
                       </span>
                     </div>
@@ -172,7 +171,7 @@ export const EnhancedPostDebateResults = ({
                   <div>
                     <div className="flex justify-between text-sm mb-1">
                       <span className="text-slate-300">Engagement</span>
-                      <span className={`${getScoreColor(metrics.engagement)} font-medium`}>
+                      <span className={`${getScoreClass(metrics.engagement)} font-medium`}>
                         {metrics.engagement}%
                       </span>
                     </div>
@@ -187,7 +186,7 @@ export const EnhancedPostDebateResults = ({
                   <div>
                     <div className="flex justify-between text-sm mb-1">
                       <span className="text-slate-300">Topic Relevance</span>
-                      <span className={`${getScoreColor(metrics.topicRelevance)} font-medium`}>
+                      <span className={`${getScoreClass(metrics.topicRelevance)} font-medium`}>
                         {metrics.topicRelevance}%
                       </span>
                     </div>
@@ -200,7 +199,7 @@ export const EnhancedPostDebateResults = ({
                   <div>
                     <div className="flex justify-between text-sm mb-1">
                       <span className="text-slate-300">Structure Score</span>
-                      <span className={`${getScoreColor(structureScore)} font-medium`}>
+                      <span className={`${getScoreClass(structureScore)} font-medium`}>
                         {structureScore}%
                       </span>
                     </div>
