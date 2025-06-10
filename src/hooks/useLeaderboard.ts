@@ -27,13 +27,19 @@ export const useLeaderboard = () => {
       const { data, error } = await supabase
         .from('leaderboard_entries')
         .select('*')
-        .order('rank', { ascending: true, nullsLast: true })
+        .order('rank', { ascending: true, nullsFirst: false })
         .order('total_score', { ascending: false })
         .limit(50);
 
       if (error) throw error;
 
-      setLeaders(data || []);
+      // Map the data to ensure trend is properly typed
+      const mappedData = (data || []).map(entry => ({
+        ...entry,
+        trend: (entry.trend as 'up' | 'down' | 'stable') || 'stable'
+      }));
+
+      setLeaders(mappedData);
     } catch (error) {
       console.error('Error fetching leaderboard:', error);
     } finally {

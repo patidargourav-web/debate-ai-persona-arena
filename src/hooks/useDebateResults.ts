@@ -48,6 +48,25 @@ export const useDebateResults = () => {
     setIsLoading(true);
 
     try {
+      // First ensure user profile exists
+      const { data: profile, error: profileError } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', user.id)
+        .single();
+
+      if (profileError && profileError.code === 'PGRST116') {
+        // Profile doesn't exist, create it
+        const displayName = user.email?.split('@')[0] || 'Anonymous User';
+        await supabase
+          .from('profiles')
+          .insert({
+            id: user.id,
+            username: displayName,
+            display_name: displayName
+          });
+      }
+
       const { data, error } = await supabase
         .from('debate_results')
         .insert({
@@ -115,7 +134,7 @@ export const useDebateResults = () => {
         try {
           await navigator.share({
             title: 'My Debate Results - Debatrix AI',
-            text: `I just scored points in my debate! Check out the live leaderboard.`,
+            text: `I just scored ${resultData.score} points in my debate! Check out the live leaderboard.`,
             url: window.location.href
           });
         } catch (shareError) {
