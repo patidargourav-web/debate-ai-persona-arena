@@ -1,5 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { VideoInterface } from '@/components/VideoInterface';
@@ -7,11 +8,32 @@ import { AnalysisPanel } from '@/components/AnalysisPanel';
 import { Leaderboard } from '@/components/Leaderboard';
 import { PostDebateResults } from '@/components/PostDebateResults';
 import { Navigation } from '@/components/Navigation';
+import { useAuth } from '@/contexts/AuthContext';
 
 const Index = () => {
   const [currentView, setCurrentView] = useState<'home' | 'debate' | 'results' | 'leaderboard'>('home');
   const [isDebating, setIsDebating] = useState(false);
   const [debateData, setDebateData] = useState(null);
+  const { user, loading } = useAuth();
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    if (!loading && !user) {
+      navigate('/auth');
+    }
+  }, [user, loading, navigate]);
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-900 to-slate-900 flex items-center justify-center">
+        <div className="text-white text-xl">Loading...</div>
+      </div>
+    );
+  }
+
+  if (!user) {
+    return null;
+  }
 
   const startDebate = () => {
     setCurrentView('debate');
@@ -50,6 +72,8 @@ const Index = () => {
         return (
           <div className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-900 to-slate-900 flex items-center justify-center">
             <div className="text-center space-y-8 max-w-4xl mx-auto px-6">
+              <Navigation currentView={currentView} onViewChange={setCurrentView} />
+              
               <div className="space-y-4">
                 <h1 className="text-6xl font-bold bg-gradient-to-r from-blue-400 via-purple-400 to-blue-400 bg-clip-text text-transparent">
                   Debatrix AI Persona
