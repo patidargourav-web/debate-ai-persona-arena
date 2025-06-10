@@ -1,18 +1,16 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import { Mic, MicOff, Video, VideoOff } from 'lucide-react';
+import { Mic, MicOff } from 'lucide-react';
 
 interface VideoInterfaceProps {
   isDebating: boolean;
   onEndDebate: (results: any) => void;
+  transcript?: string;
 }
 
-export const VideoInterface = ({ isDebating, onEndDebate }: VideoInterfaceProps) => {
-  const [isRecording, setIsRecording] = useState(false);
-  const [isMuted, setIsMuted] = useState(false);
-  const [isVideoOn, setIsVideoOn] = useState(true);
-  const [transcript, setTranscript] = useState('');
+export const VideoInterface = ({ isDebating, onEndDebate, transcript }: VideoInterfaceProps) => {
   const [debateTimer, setDebateTimer] = useState(0);
   const [aiPersonaReady, setAiPersonaReady] = useState(false);
   const [persona, setPersona] = useState<any>(null);
@@ -21,7 +19,6 @@ export const VideoInterface = ({ isDebating, onEndDebate }: VideoInterfaceProps)
   const [error, setError] = useState<string | null>(null);
   const [iframeLoaded, setIframeLoaded] = useState(false);
   const aiVideoRef = useRef<HTMLIFrameElement>(null);
-  const recognitionRef = useRef<any>(null);
   const conversationCleanupRef = useRef<string | null>(null);
 
   const TAVUS_API_KEY = 'ce3813432eaa4955b4453267bab295b2';
@@ -47,9 +44,6 @@ export const VideoInterface = ({ isDebating, onEndDebate }: VideoInterfaceProps)
   }, [isDebating]);
 
   const cleanup = async () => {
-    stopSpeechRecognition();
-    
-    // Clean up any active conversation
     if (conversationCleanupRef.current) {
       try {
         await endConversation(conversationCleanupRef.current);
@@ -157,45 +151,6 @@ export const VideoInterface = ({ isDebating, onEndDebate }: VideoInterfaceProps)
     }
   };
 
-  const sendMessage = async (message: string) => {
-    if (!conversation?.conversation_id) {
-      throw new Error('No active conversation');
-    }
-
-    setLoading(true);
-    setError(null);
-    
-    try {
-      const options = {
-        method: 'POST',
-        headers: {
-          'x-api-key': TAVUS_API_KEY,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          text: message,
-        })
-      };
-      
-      const response = await fetch(`https://tavusapi.com/v2/conversations/${conversation.conversation_id}/speak`, options);
-      const data = await response.json();
-      
-      if (!response.ok) {
-        throw new Error(data.message || 'Failed to send message');
-      }
-      
-      console.log('Message sent to AI:', data);
-      return data;
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to send message';
-      setError(errorMessage);
-      console.error('Error sending message:', err);
-      throw err;
-    } finally {
-      setLoading(false);
-    }
-  };
-
   const initializeAIPersona = async () => {
     try {
       console.log('Initializing AI persona...');
@@ -207,18 +162,13 @@ export const VideoInterface = ({ isDebating, onEndDebate }: VideoInterfaceProps)
       
       if (conversationData?.conversation_url && aiVideoRef.current) {
         console.log('Setting iframe src:', conversationData.conversation_url);
-        // Set the iframe src immediately
         aiVideoRef.current.src = conversationData.conversation_url;
         
-        // Set ready state after a delay to allow iframe to load
         setTimeout(() => {
           setAiPersonaReady(true);
           console.log('AI persona ready for debate');
         }, 3000);
       }
-      
-      // Start speech recognition
-      initializeSpeechRecognition();
     } catch (error) {
       console.error('Failed to initialize AI persona:', error);
       setError('Failed to initialize AI persona. Using fallback mode.');
@@ -236,78 +186,6 @@ export const VideoInterface = ({ isDebating, onEndDebate }: VideoInterfaceProps)
     setError('Failed to load AI video. Check connection.');
   };
 
-  const initializeSpeechRecognition = () => {
-    if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
-      const SpeechRecognition = (window as any).webkitSpeechRecognition || (window as any).SpeechRecognition;
-      recognitionRef.current = new SpeechRecognition();
-      recognitionRef.current.continuous = true;
-      recognitionRef.current.interimResults = true;
-
-      recognitionRef.current.onresult = (event: any) => {
-        let finalTranscript = '';
-        for (let i = event.resultIndex; i < event.results.length; i++) {
-          if (event.results[i].isFinal) {
-            finalTranscript += event.results[i][0].transcript;
-          }
-        }
-        if (finalTranscript) {
-          setTranscript(finalTranscript);
-          handleUserSpeech(finalTranscript);
-        }
-      };
-
-      recognitionRef.current.onerror = (event: any) => {
-        console.error('Speech recognition error:', event.error);
-      };
-    }
-  };
-
-  const stopSpeechRecognition = () => {
-    if (recognitionRef.current) {
-      recognitionRef.current.stop();
-    }
-  };
-
-  const handleUserSpeech = async (userInput: string) => {
-    if (!conversation?.conversation_id || !aiPersonaReady) {
-      console.log('AI persona not ready, generating fallback response');
-      generateFallbackResponse(userInput);
-      return;
-    }
-
-    try {
-      console.log('Sending user speech to AI persona:', userInput);
-      await sendMessage(userInput);
-    } catch (error) {
-      console.error('Failed to send message to AI persona:', error);
-      generateFallbackResponse(userInput);
-    }
-  };
-
-  const generateFallbackResponse = (userInput: string) => {
-    const responses = [
-      "That's an interesting point about climate change. However, have you considered the economic implications of rapid renewable energy transitions?",
-      "I appreciate your perspective, but the data suggests we need more immediate action on carbon emissions reduction.",
-      "While that argument has merit, it overlooks the technological innovations that are making clean energy more affordable.",
-      "Let me challenge that assumption - what about the job creation potential in the green energy sector?",
-      "Your point is valid, but we must also consider the long-term environmental costs of maintaining the status quo."
-    ];
-    
-    setTimeout(() => {
-      const randomResponse = responses[Math.floor(Math.random() * responses.length)];
-      console.log('AI Persona (fallback):', randomResponse);
-    }, 1000);
-  };
-
-  const toggleRecording = () => {
-    if (isRecording) {
-      recognitionRef.current?.stop();
-    } else {
-      recognitionRef.current?.start();
-    }
-    setIsRecording(!isRecording);
-  };
-
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
     const secs = seconds % 60;
@@ -315,7 +193,6 @@ export const VideoInterface = ({ isDebating, onEndDebate }: VideoInterfaceProps)
   };
 
   const handleEndDebate = async () => {
-    // Clean up conversation before ending
     if (conversationCleanupRef.current) {
       try {
         await endConversation(conversationCleanupRef.current);
@@ -327,7 +204,7 @@ export const VideoInterface = ({ isDebating, onEndDebate }: VideoInterfaceProps)
 
     const results = {
       duration: debateTimer,
-      transcript: transcript,
+      transcript: transcript || '',
       score: Math.floor(Math.random() * 40) + 60,
       metrics: {
         argumentStrength: Math.floor(Math.random() * 30) + 70,
@@ -344,7 +221,7 @@ export const VideoInterface = ({ isDebating, onEndDebate }: VideoInterfaceProps)
       {/* Header */}
       <div className="p-4 bg-slate-900/50 backdrop-blur-sm flex justify-between items-center">
         <div className="text-white">
-          <h2 className="text-xl font-semibold">Debate Session</h2>
+          <h2 className="text-xl font-semibold">🎯 Live Debate Session</h2>
           <p className="text-sm text-slate-400">
             Topic: Climate Change Solutions
             {error && <span className="text-red-400 ml-2">• {error}</span>}
@@ -353,15 +230,15 @@ export const VideoInterface = ({ isDebating, onEndDebate }: VideoInterfaceProps)
             {conversation && !aiPersonaReady && <span className="text-blue-400 ml-2">• Connecting to AI...</span>}
           </p>
         </div>
-        <div className="text-white text-lg font-mono">
-          {formatTime(debateTimer)}
+        <div className="text-white text-xl font-mono bg-slate-800/50 px-4 py-2 rounded">
+          ⏱️ {formatTime(debateTimer)}
         </div>
       </div>
 
-      {/* Single AI Video Area */}
+      {/* AI Video Area */}
       <div className="flex-1 p-8 flex justify-center items-center">
         <Card className="bg-slate-800/50 backdrop-blur-sm border-blue-500/30 p-6 w-full max-w-4xl">
-          <h3 className="text-white font-semibold mb-4 text-center text-xl">AI Debate Persona - Debatrix</h3>
+          <h3 className="text-white font-semibold mb-4 text-center text-xl">🤖 AI Debate Persona - Debatrix</h3>
           <div className="rounded-lg overflow-hidden relative bg-slate-900/50" style={{ aspectRatio: '16/9', minHeight: '500px' }}>
             {conversation?.conversation_url ? (
               <>
@@ -399,10 +276,10 @@ export const VideoInterface = ({ isDebating, onEndDebate }: VideoInterfaceProps)
               </div>
             )}
             
-            {/* Transcript overlay */}
+            {/* Live transcript overlay */}
             {transcript && (
               <div className="absolute bottom-4 left-4 right-4 bg-slate-900/90 backdrop-blur-sm p-4 rounded-lg">
-                <p className="text-white text-sm"><strong>You said:</strong> {transcript}</p>
+                <p className="text-white text-sm"><strong>🎤 Live Transcript:</strong> {transcript}</p>
               </div>
             )}
           </div>
@@ -412,35 +289,12 @@ export const VideoInterface = ({ isDebating, onEndDebate }: VideoInterfaceProps)
       {/* Controls */}
       <div className="p-4 bg-slate-900/50 backdrop-blur-sm flex justify-center space-x-4">
         <Button
-          onClick={toggleRecording}
-          className={`${isRecording ? 'bg-red-600 hover:bg-red-700' : 'bg-green-600 hover:bg-green-700'} text-white px-6 py-3`}
-        >
-          {isRecording ? <MicOff className="w-5 h-5 mr-2" /> : <Mic className="w-5 h-5 mr-2" />}
-          {isRecording ? 'Stop Recording' : 'Start Recording'}
-        </Button>
-        
-        <Button
-          onClick={() => setIsMuted(!isMuted)}
-          variant="outline"
-          className="border-slate-600 text-white px-6 py-3"
-        >
-          {isMuted ? <MicOff className="w-5 h-5" /> : <Mic className="w-5 h-5" />}
-        </Button>
-        
-        <Button
-          onClick={() => setIsVideoOn(!isVideoOn)}
-          variant="outline"
-          className="border-slate-600 text-white px-6 py-3"
-        >
-          {isVideoOn ? <Video className="w-5 h-5" /> : <VideoOff className="w-5 h-5" />}
-        </Button>
-
-        <Button
           onClick={handleEndDebate}
           variant="destructive"
-          className="px-6 py-3"
+          size="lg"
+          className="px-8 py-3 text-lg"
         >
-          End Debate
+          🏁 End Debate & Get Results
         </Button>
       </div>
     </div>
