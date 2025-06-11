@@ -89,24 +89,34 @@ const Index = () => {
       case 'debate':
         return (
           <div className="min-h-screen bg-background">
-            {/* Mobile: Stack vertically, Desktop: Side by side */}
-            <div className="flex flex-col lg:flex-row min-h-screen">
-              {/* Video Interface - Takes full width on mobile, 2/3 on desktop */}
-              <div className="w-full lg:flex-1 h-[50vh] sm:h-[60vh] lg:h-screen order-1">
-                <VideoInterface 
-                  isDebating={isDebating} 
-                  onEndDebate={endDebate}
-                  transcript={transcript}
-                />
+            {/* Mobile: Stack vertically with distinct sections, Desktop: Side by side */}
+            <div className="flex flex-col lg:flex-row h-screen">
+              {/* Video Section - Full height on mobile and desktop */}
+              <div className="w-full lg:flex-1">
+                <div className="h-screen lg:h-full">
+                  <VideoInterface 
+                    isDebating={isDebating} 
+                    onEndDebate={endDebate}
+                    transcript={transcript}
+                  />
+                </div>
               </div>
               
-              {/* Analysis Panel - Full width on mobile, fixed width on desktop */}
-              <div className="w-full lg:w-80 xl:w-96 h-[50vh] sm:h-[40vh] lg:h-screen border-t lg:border-t-0 lg:border-l border-border bg-background order-2 overflow-hidden">
+              {/* Analysis Panel Section - Hidden on mobile, shown on desktop */}
+              <div className="hidden lg:block lg:w-80 xl:w-96 h-screen border-l border-border bg-background overflow-hidden">
                 <RealTimeAnalysisPanel 
                   isActive={isDebating} 
                   onTranscriptUpdate={handleTranscriptUpdate}
                 />
               </div>
+            </div>
+            
+            {/* Mobile Analysis Panel - Positioned as overlay at bottom */}
+            <div className="lg:hidden fixed bottom-0 left-0 right-0 h-64 bg-background border-t border-border z-10 overflow-hidden">
+              <RealTimeAnalysisPanel 
+                isActive={isDebating} 
+                onTranscriptUpdate={handleTranscriptUpdate}
+              />
             </div>
           </div>
         );
