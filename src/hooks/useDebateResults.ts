@@ -103,7 +103,7 @@ export const useDebateResults = () => {
     }
   };
 
-  const shareDebateResult = async (resultId: string) => {
+  const shareDebateResult = async (resultId: string, score: number) => {
     if (!user) {
       toast({
         title: "Authentication Required",
@@ -134,7 +134,7 @@ export const useDebateResults = () => {
         try {
           await navigator.share({
             title: 'My Debate Results - Debatrix AI',
-            text: `I just scored ${resultData.score} points in my debate! Check out the live leaderboard.`,
+            text: `I just scored ${score} points in my debate! Check out the live leaderboard.`,
             url: window.location.href
           });
         } catch (shareError) {
