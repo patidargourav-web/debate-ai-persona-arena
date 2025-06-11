@@ -21,8 +21,8 @@ export const VideoInterface = ({ isDebating, onEndDebate, transcript }: VideoInt
   const aiVideoRef = useRef<HTMLIFrameElement>(null);
   const conversationCleanupRef = useRef<string | null>(null);
 
-  const TAVUS_API_KEY = 'ce3813432eaa4955b4453267bab295b2';
-  const PERSONA_ID = 'p8494ff3054c';
+  const TAVUS_API_KEY = '75f20ee320cc44bbbe0b8dd2cf21f3b5';
+  const PERSONA_ID = 'p30ebea6917c';
 
   useEffect(() => {
     let interval: NodeJS.Timeout;
