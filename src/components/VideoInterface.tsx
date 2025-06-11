@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -7,10 +6,10 @@ import { Mic, MicOff } from 'lucide-react';
 interface VideoInterfaceProps {
   isDebating: boolean;
   onEndDebate: (results: any) => void;
-  transcript?: string;
+  onTranscriptUpdate?: (transcript: { speaker: 'AI' | 'Person'; text: string; timestamp: number }[]) => void;
 }
 
-export const VideoInterface = ({ isDebating, onEndDebate, transcript }: VideoInterfaceProps) => {
+export const VideoInterface = ({ isDebating, onEndDebate, onTranscriptUpdate }: VideoInterfaceProps) => {
   const [debateTimer, setDebateTimer] = useState(0);
   const [aiPersonaReady, setAiPersonaReady] = useState(false);
   const [persona, setPersona] = useState<any>(null);
@@ -18,6 +17,7 @@ export const VideoInterface = ({ isDebating, onEndDebate, transcript }: VideoInt
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [iframeLoaded, setIframeLoaded] = useState(false);
+  const [transcriptHistory, setTranscriptHistory] = useState<{ speaker: 'AI' | 'Person'; text: string; timestamp: number }[]>([]);
   const aiVideoRef = useRef<HTMLIFrameElement>(null);
   const conversationCleanupRef = useRef<string | null>(null);
 
@@ -42,6 +42,57 @@ export const VideoInterface = ({ isDebating, onEndDebate, transcript }: VideoInt
       cleanup();
     };
   }, [isDebating]);
+
+  // Listen for AI responses from the iframe
+  useEffect(() => {
+    const handleMessage = (event: MessageEvent) => {
+      if (event.origin !== 'https://tavus.daily.co') return;
+      
+      try {
+        const data = event.data;
+        if (data.type === 'ai_speech' && data.transcript) {
+          const newEntry = {
+            speaker: 'AI' as const,
+            text: data.transcript,
+            timestamp: Date.now()
+          };
+          
+          setTranscriptHistory(prev => {
+            const updated = [...prev, newEntry];
+            onTranscriptUpdate?.(updated);
+            return updated;
+          });
+        }
+      } catch (error) {
+        console.error('Error handling iframe message:', error);
+      }
+    };
+
+    window.addEventListener('message', handleMessage);
+    return () => window.removeEventListener('message', handleMessage);
+  }, [onTranscriptUpdate]);
+
+  const addUserTranscript = (text: string) => {
+    const newEntry = {
+      speaker: 'Person' as const,
+      text: text,
+      timestamp: Date.now()
+    };
+    
+    setTranscriptHistory(prev => {
+      const updated = [...prev, newEntry];
+      onTranscriptUpdate?.(updated);
+      return updated;
+    });
+  };
+
+  // Expose function to parent component for user speech
+  useEffect(() => {
+    (window as any).addUserTranscript = addUserTranscript;
+    return () => {
+      delete (window as any).addUserTranscript;
+    };
+  }, []);
 
   const cleanup = async () => {
     if (conversationCleanupRef.current) {
@@ -202,9 +253,14 @@ export const VideoInterface = ({ isDebating, onEndDebate, transcript }: VideoInt
       }
     }
 
+    const fullTranscript = transcriptHistory.map(entry => 
+      `${entry.speaker}: ${entry.text}`
+    ).join('\n');
+
     const results = {
       duration: debateTimer,
-      transcript: transcript || '',
+      transcript: fullTranscript,
+      transcriptHistory: transcriptHistory,
       score: Math.floor(Math.random() * 40) + 60,
       metrics: {
         argumentStrength: Math.floor(Math.random() * 30) + 70,
@@ -277,9 +333,19 @@ export const VideoInterface = ({ isDebating, onEndDebate, transcript }: VideoInt
             )}
             
             {/* Live transcript overlay */}
-            {transcript && (
-              <div className="absolute bottom-4 left-4 right-4 bg-slate-900/90 backdrop-blur-sm p-4 rounded-lg">
-                <p className="text-white text-sm"><strong>🎤 Live Transcript:</strong> {transcript}</p>
+            {transcriptHistory.length > 0 && (
+              <div className="absolute bottom-4 left-4 right-4 bg-slate-900/90 backdrop-blur-sm p-4 rounded-lg max-h-32 overflow-y-auto">
+                <p className="text-white text-sm font-semibold mb-2">🎤 Live Conversation:</p>
+                <div className="space-y-1">
+                  {transcriptHistory.slice(-3).map((entry, index) => (
+                    <p key={index} className="text-sm">
+                      <span className={entry.speaker === 'AI' ? 'text-blue-400 font-medium' : 'text-green-400 font-medium'}>
+                        {entry.speaker}:
+                      </span>
+                      <span className="text-white ml-2">{entry.text}</span>
+                    </p>
+                  ))}
+                </div>
               </div>
             )}
           </div>

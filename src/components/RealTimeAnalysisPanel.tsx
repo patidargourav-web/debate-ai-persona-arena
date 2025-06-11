@@ -8,10 +8,11 @@ import { useDebateAnalysis } from '@/hooks/useDebateAnalysis';
 
 interface RealTimeAnalysisPanelProps {
   isActive: boolean;
-  onTranscriptUpdate?: (transcript: string) => void;
+  onTranscriptUpdate?: (transcript: { speaker: 'AI' | 'Person'; text: string; timestamp: number }[]) => void;
+  transcriptHistory?: { speaker: 'AI' | 'Person'; text: string; timestamp: number }[];
 }
 
-export const RealTimeAnalysisPanel = ({ isActive, onTranscriptUpdate }: RealTimeAnalysisPanelProps) => {
+export const RealTimeAnalysisPanel = ({ isActive, onTranscriptUpdate, transcriptHistory = [] }: RealTimeAnalysisPanelProps) => {
   const {
     isListening,
     transcript,
@@ -35,9 +36,12 @@ export const RealTimeAnalysisPanel = ({ isActive, onTranscriptUpdate }: RealTime
   useEffect(() => {
     if (transcript) {
       analyzeDebateContent(transcript, confidence);
-      onTranscriptUpdate?.(transcript);
+      // Add user transcript to global function
+      if ((window as any).addUserTranscript) {
+        (window as any).addUserTranscript(transcript);
+      }
     }
-  }, [transcript, confidence, analyzeDebateContent, onTranscriptUpdate]);
+  }, [transcript, confidence, analyzeDebateContent]);
 
   const getScoreColor = (score: number) => {
     if (score >= 80) return 'text-green-400';
@@ -72,7 +76,7 @@ export const RealTimeAnalysisPanel = ({ isActive, onTranscriptUpdate }: RealTime
           </div>
           <Progress value={confidence * 100} className="h-2" />
           {interimTranscript && (
-            <p className="text-xs text-blue-400 italic">"{interimTranscript}"</p>
+            <p className="text-xs text-green-400 italic">You: "{interimTranscript}"</p>
           )}
         </CardContent>
       </Card>
@@ -191,17 +195,45 @@ export const RealTimeAnalysisPanel = ({ isActive, onTranscriptUpdate }: RealTime
         </CardContent>
       </Card>
 
-      {/* Live Transcript */}
-      {transcript && (
+      {/* Conversation History */}
+      {transcriptHistory.length > 0 && (
         <Card className="bg-slate-800/50 backdrop-blur-sm border-blue-500/30">
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm text-white">Live Transcript</CardTitle>
+            <CardTitle className="text-sm text-white">Conversation History</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="max-h-32 overflow-y-auto text-xs text-slate-300 bg-slate-900/50 p-2 rounded">
-              {transcript}
+            <div className="max-h-40 overflow-y-auto text-xs space-y-2 bg-slate-900/50 p-3 rounded">
+              {transcriptHistory.map((entry, index) => (
+                <div key={index} className="flex flex-col space-y-1">
+                  <div className="flex items-center space-x-2">
+                    <span className={`font-medium ${
+                      entry.speaker === 'AI' ? 'text-blue-400' : 'text-green-400'
+                    }`}>
+                      {entry.speaker === 'AI' ? '🤖 Debatrix' : '👤 You'}:
+                    </span>
+                    <span className="text-xs text-slate-400">
+                      {new Date(entry.timestamp).toLocaleTimeString()}
+                    </span>
+                  </div>
+                  <p className="text-white text-sm ml-4">{entry.text}</p>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Current User Input */}
+      {(transcript || interimTranscript) && (
+        <Card className="bg-slate-800/50 backdrop-blur-sm border-green-500/30">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm text-white">Your Current Speech</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="max-h-24 overflow-y-auto text-xs text-slate-300 bg-slate-900/50 p-2 rounded">
+              {transcript && <p className="text-green-400">Confirmed: {transcript}</p>}
               {interimTranscript && (
-                <span className="text-blue-400 italic"> {interimTranscript}</span>
+                <p className="text-yellow-400 italic">Speaking: {interimTranscript}</p>
               )}
             </div>
           </CardContent>
