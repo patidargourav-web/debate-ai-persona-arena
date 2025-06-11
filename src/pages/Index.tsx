@@ -27,8 +27,11 @@ const Index = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-900 to-slate-900 flex items-center justify-center">
-        <div className="text-white text-xl">Loading...</div>
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="flex flex-col items-center space-y-4">
+          <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin"></div>
+          <p className="text-muted-foreground">Loading your debate arena...</p>
+        </div>
       </div>
     );
   }
@@ -46,13 +49,12 @@ const Index = () => {
   const endDebate = (results: any) => {
     setIsDebating(false);
     
-    // Enhanced results with comparison and improvements
     const enhancedResults: DebateResultsData = {
       ...results,
       comparison: {
-        aiScore: Math.floor(Math.random() * 20) + 80, // AI typically scores 80-100
-        averageUserScore: Math.floor(Math.random() * 30) + 60, // Average user 60-90
-        percentileRank: Math.floor(Math.random() * 40) + 60, // User's percentile
+        aiScore: Math.floor(Math.random() * 20) + 80,
+        averageUserScore: Math.floor(Math.random() * 30) + 60,
+        percentileRank: Math.floor(Math.random() * 40) + 60,
       },
       improvements: [
         "Practice using more concrete evidence to support your arguments",
@@ -60,7 +62,7 @@ const Index = () => {
         "Improve your conclusion to better summarize key points",
         "Work on maintaining eye contact with the camera",
         "Structure your arguments with clearer transitions"
-      ].slice(0, Math.floor(Math.random() * 3) + 2), // Random 2-4 suggestions
+      ].slice(0, Math.floor(Math.random() * 3) + 2),
       metrics: {
         ...results.metrics,
         topicRelevance: Math.floor(Math.random() * 40) + 60,
@@ -86,15 +88,15 @@ const Index = () => {
     switch (currentView) {
       case 'debate':
         return (
-          <div className="flex h-screen bg-gradient-to-br from-slate-900 via-blue-900 to-slate-900">
-            <div className="flex-1 relative">
+          <div className="flex flex-col lg:flex-row h-screen bg-background">
+            <div className="flex-1 relative min-h-[60vh] lg:min-h-full">
               <VideoInterface 
                 isDebating={isDebating} 
                 onEndDebate={endDebate}
                 transcript={transcript}
               />
             </div>
-            <div className="w-96 bg-slate-800/50 backdrop-blur-sm border-l border-blue-500/30">
+            <div className="w-full lg:w-96 border-t lg:border-t-0 lg:border-l border-border">
               <RealTimeAnalysisPanel 
                 isActive={isDebating} 
                 onTranscriptUpdate={handleTranscriptUpdate}
@@ -112,63 +114,104 @@ const Index = () => {
         );
       case 'leaderboard':
         return (
-          <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 p-6">
-            <Navigation currentView={currentView} onViewChange={setCurrentView} />
-            <EnhancedLeaderboard />
+          <div className="min-h-screen bg-background">
+            <div className="container mx-auto px-4 py-6 lg:py-8">
+              <Navigation currentView={currentView} onViewChange={setCurrentView} />
+              <div className="mt-8">
+                <EnhancedLeaderboard />
+              </div>
+            </div>
           </div>
         );
       default:
         return (
-          <div className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-900 to-slate-900 flex items-center justify-center">
-            <div className="text-center space-y-8 max-w-4xl mx-auto px-6">
+          <div className="min-h-screen bg-background">
+            <div className="container mx-auto px-4 py-6 lg:py-12">
               <Navigation currentView={currentView} onViewChange={setCurrentView} />
               
-              <div className="space-y-4">
-                <h1 className="text-6xl font-bold bg-gradient-to-r from-blue-400 via-purple-400 to-blue-400 bg-clip-text text-transparent">
-                  Debatrix AI Persona
-                </h1>
-                <p className="text-xl text-slate-300 max-w-2xl mx-auto">
-                  Engage in real-time debates with our AI persona. Get live speech analysis, performance feedback, and compete on the global leaderboard.
-                </p>
-              </div>
-              
-              <div className="flex gap-4 justify-center">
-                <Button 
-                  onClick={startDebate}
-                  className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white px-8 py-4 text-lg font-semibold rounded-xl shadow-lg hover:shadow-xl transition-all duration-300"
-                >
-                  🎯 Start Real-Time Debate
-                </Button>
-                <Button 
-                  onClick={() => setCurrentView('leaderboard')}
-                  variant="outline"
-                  className="border-blue-500 text-blue-400 hover:bg-blue-500 hover:text-white px-8 py-4 text-lg font-semibold rounded-xl transition-all duration-300"
-                >
-                  🏆 Live Leaderboard
-                </Button>
+              {/* Hero Section */}
+              <div className="text-center space-y-8 max-w-4xl mx-auto animate-slide-up">
+                <div className="space-y-6">
+                  <h1 className="text-display gradient-text animate-float">
+                    Debatrix AI
+                  </h1>
+                  <p className="text-subheading text-muted-foreground max-w-2xl mx-auto leading-relaxed">
+                    Master the art of debate with our AI-powered platform. Get real-time analysis, 
+                    personalized feedback, and compete globally.
+                  </p>
+                </div>
+                
+                {/* CTA Buttons */}
+                <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
+                  <Button 
+                    onClick={startDebate}
+                    className="btn-primary text-lg px-8 py-4 w-full sm:w-auto animate-glow"
+                  >
+                    🎯 Start Debate Challenge
+                  </Button>
+                  <Button 
+                    onClick={() => setCurrentView('leaderboard')}
+                    className="btn-ghost text-lg px-8 py-4 w-full sm:w-auto"
+                  >
+                    🏆 View Leaderboard
+                  </Button>
+                </div>
               </div>
 
-              <div className="grid md:grid-cols-4 gap-6 mt-12">
-                <Card className="bg-slate-800/50 backdrop-blur-sm border-blue-500/30 p-6 text-center">
-                  <div className="text-3xl mb-4">🤖</div>
-                  <h3 className="text-lg font-semibold text-white mb-2">AI Video Persona</h3>
-                  <p className="text-slate-400">Realistic AI avatar with lip-synced responses</p>
+              {/* Features Grid */}
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mt-16 lg:mt-24">
+                <Card className="card-feature text-center p-6 animate-fade-in">
+                  <div className="text-4xl mb-4 animate-float">🤖</div>
+                  <h3 className="text-heading text-foreground mb-3">AI Opponent</h3>
+                  <p className="text-body text-muted-foreground">
+                    Debate against sophisticated AI with realistic responses and adaptive arguments
+                  </p>
                 </Card>
-                <Card className="bg-slate-800/50 backdrop-blur-sm border-purple-500/30 p-6 text-center">
-                  <div className="text-3xl mb-4">🎤</div>
-                  <h3 className="text-lg font-semibold text-white mb-2">Speech Recognition</h3>
-                  <p className="text-slate-400">Real-time transcription and analysis</p>
+                
+                <Card className="card-feature text-center p-6 animate-fade-in" style={{animationDelay: '0.1s'}}>
+                  <div className="text-4xl mb-4 animate-float" style={{animationDelay: '1s'}}>🎤</div>
+                  <h3 className="text-heading text-foreground mb-3">Real-time Analysis</h3>
+                  <p className="text-body text-muted-foreground">
+                    Live speech recognition with instant feedback on your argumentation skills
+                  </p>
                 </Card>
-                <Card className="bg-slate-800/50 backdrop-blur-sm border-green-500/30 p-6 text-center">
-                  <div className="text-3xl mb-4">📊</div>
-                  <h3 className="text-lg font-semibold text-white mb-2">Live Feedback</h3>
-                  <p className="text-slate-400">Instant analysis of your debate performance</p>
+                
+                <Card className="card-feature text-center p-6 animate-fade-in" style={{animationDelay: '0.2s'}}>
+                  <div className="text-4xl mb-4 animate-float" style={{animationDelay: '2s'}}>📊</div>
+                  <h3 className="text-heading text-foreground mb-3">Performance Insights</h3>
+                  <p className="text-body text-muted-foreground">
+                    Detailed analytics on clarity, structure, and persuasiveness of your arguments
+                  </p>
                 </Card>
-                <Card className="bg-slate-800/50 backdrop-blur-sm border-orange-500/30 p-6 text-center">
-                  <div className="text-3xl mb-4">🏆</div>
-                  <h3 className="text-lg font-semibold text-white mb-2">Global Rankings</h3>
-                  <p className="text-slate-400">Live leaderboard with real-time updates</p>
+                
+                <Card className="card-feature text-center p-6 animate-fade-in" style={{animationDelay: '0.3s'}}>
+                  <div className="text-4xl mb-4 animate-float" style={{animationDelay: '3s'}}>🏆</div>
+                  <h3 className="text-heading text-foreground mb-3">Global Competition</h3>
+                  <p className="text-body text-muted-foreground">
+                    Compete with debaters worldwide and climb the live leaderboard rankings
+                  </p>
                 </Card>
+              </div>
+
+              {/* Stats Section */}
+              <div className="mt-16 lg:mt-24">
+                <div className="card-modern text-center max-w-3xl mx-auto">
+                  <h2 className="text-heading mb-8">Join the Debate Revolution</h2>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-8">
+                    <div className="space-y-2">
+                      <div className="text-4xl font-bold text-primary">1000+</div>
+                      <p className="text-muted-foreground">Active Debaters</p>
+                    </div>
+                    <div className="space-y-2">
+                      <div className="text-4xl font-bold text-primary">50k+</div>
+                      <p className="text-muted-foreground">Debates Completed</p>
+                    </div>
+                    <div className="space-y-2">
+                      <div className="text-4xl font-bold text-primary">98%</div>
+                      <p className="text-muted-foreground">Skill Improvement</p>
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
