@@ -88,19 +88,25 @@ const Index = () => {
     switch (currentView) {
       case 'debate':
         return (
-          <div className="flex flex-col lg:flex-row h-screen bg-background">
-            <div className="flex-1 relative min-h-[60vh] lg:min-h-full">
-              <VideoInterface 
-                isDebating={isDebating} 
-                onEndDebate={endDebate}
-                transcript={transcript}
-              />
-            </div>
-            <div className="w-full lg:w-96 border-t lg:border-t-0 lg:border-l border-border">
-              <RealTimeAnalysisPanel 
-                isActive={isDebating} 
-                onTranscriptUpdate={handleTranscriptUpdate}
-              />
+          <div className="min-h-screen bg-background">
+            {/* Mobile: Stack vertically, Desktop: Side by side */}
+            <div className="flex flex-col lg:flex-row min-h-screen">
+              {/* Video Interface - Takes full width on mobile, 2/3 on desktop */}
+              <div className="w-full lg:flex-1 h-[50vh] sm:h-[60vh] lg:h-screen order-1">
+                <VideoInterface 
+                  isDebating={isDebating} 
+                  onEndDebate={endDebate}
+                  transcript={transcript}
+                />
+              </div>
+              
+              {/* Analysis Panel - Full width on mobile, fixed width on desktop */}
+              <div className="w-full lg:w-80 xl:w-96 h-[50vh] sm:h-[40vh] lg:h-screen border-t lg:border-t-0 lg:border-l border-border bg-background order-2 overflow-hidden">
+                <RealTimeAnalysisPanel 
+                  isActive={isDebating} 
+                  onTranscriptUpdate={handleTranscriptUpdate}
+                />
+              </div>
             </div>
           </div>
         );
