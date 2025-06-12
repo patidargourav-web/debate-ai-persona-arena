@@ -1,9 +1,11 @@
+
 import React, { useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
 import { useSpeechRecognition } from '@/hooks/useSpeechRecognition';
 import { useDebateAnalysis } from '@/hooks/useDebateAnalysis';
+import { useTranscription } from '@/hooks/useTranscription';
 
 interface RealTimeAnalysisPanelProps {
   isActive: boolean;
@@ -11,7 +13,7 @@ interface RealTimeAnalysisPanelProps {
   transcriptHistory?: { speaker: 'AI' | 'Person'; text: string; timestamp: number }[];
 }
 
-export const RealTimeAnalysisPanel = ({ isActive, onTranscriptUpdate, transcriptHistory = [] }: RealTimeAnalysisPanelProps) => {
+export const RealTimeAnalysisPanel = ({ isActive }: RealTimeAnalysisPanelProps) => {
   const {
     isListening,
     transcript,
@@ -23,6 +25,15 @@ export const RealTimeAnalysisPanel = ({ isActive, onTranscriptUpdate, transcript
   } = useSpeechRecognition();
 
   const { metrics, analyzeDebateContent } = useDebateAnalysis();
+  
+  const {
+    transcriptHistory,
+    currentUserSpeech,
+    isUserSpeaking,
+    addUserTranscript,
+    updateCurrentUserSpeech,
+    setUserSpeaking
+  } = useTranscription();
 
   useEffect(() => {
     if (isActive && !isListening) {
@@ -34,24 +45,17 @@ export const RealTimeAnalysisPanel = ({ isActive, onTranscriptUpdate, transcript
 
   useEffect(() => {
     if (transcript) {
+      console.log('RealTimeAnalysisPanel: Processing user transcript:', transcript);
       analyzeDebateContent(transcript, confidence);
-      
-      // Add user transcript through global function
-      if ((window as any).addUserTranscript) {
-        (window as any).addUserTranscript(transcript);
-      }
+      addUserTranscript(transcript, confidence);
     }
-  }, [transcript, confidence, analyzeDebateContent]);
+  }, [transcript, confidence, analyzeDebateContent, addUserTranscript]);
 
   // Update current speech state for real-time display
   useEffect(() => {
-    if ((window as any).setCurrentUserSpeech) {
-      (window as any).setCurrentUserSpeech(interimTranscript);
-    }
-    if ((window as any).setIsUserSpeaking) {
-      (window as any).setIsUserSpeaking(isListening && (interimTranscript.length > 0 || transcript.length > 0));
-    }
-  }, [interimTranscript, isListening, transcript]);
+    updateCurrentUserSpeech(interimTranscript);
+    setUserSpeaking(isListening && (interimTranscript.length > 0 || transcript.length > 0));
+  }, [interimTranscript, isListening, transcript, updateCurrentUserSpeech, setUserSpeaking]);
 
   const getScoreColor = (score: number) => {
     if (score >= 80) return 'text-green-400';
@@ -85,8 +89,8 @@ export const RealTimeAnalysisPanel = ({ isActive, onTranscriptUpdate, transcript
             <span className="text-slate-300">{Math.round(confidence * 100)}%</span>
           </div>
           <Progress value={confidence * 100} className="h-2" />
-          {interimTranscript && (
-            <p className="text-xs text-green-400 italic">🎤 Speaking: "{interimTranscript}"</p>
+          {currentUserSpeech && (
+            <p className="text-xs text-green-400 italic">🎤 Speaking: "{currentUserSpeech}"</p>
           )}
           {transcript && (
             <p className="text-xs text-green-300">✅ Last said: "{transcript.slice(-50)}..."</p>
@@ -208,7 +212,7 @@ export const RealTimeAnalysisPanel = ({ isActive, onTranscriptUpdate, transcript
         </CardContent>
       </Card>
 
-      {/* Enhanced Conversation History */}
+      {/* Enhanced Live Transcript Display */}
       {transcriptHistory.length > 0 && (
         <Card className="bg-slate-800/50 backdrop-blur-sm border-blue-500/30">
           <CardHeader className="pb-2">
@@ -234,14 +238,19 @@ export const RealTimeAnalysisPanel = ({ isActive, onTranscriptUpdate, transcript
                     </span>
                   </div>
                   <p className="text-white text-sm leading-relaxed">{entry.text}</p>
+                  {entry.confidence && (
+                    <p className="text-xs text-slate-400 mt-1">
+                      Confidence: {Math.round(entry.confidence * 100)}%
+                    </p>
+                  )}
                 </div>
               ))}
-              {interimTranscript && (
+              {currentUserSpeech && (
                 <div className="border-l-2 border-green-400 pl-3 bg-green-900/20 rounded-r">
                   <span className="font-medium text-sm text-green-400">
                     👤 You (speaking):
                   </span>
-                  <p className="text-yellow-400 text-sm italic leading-relaxed">{interimTranscript}</p>
+                  <p className="text-yellow-400 text-sm italic leading-relaxed">{currentUserSpeech}</p>
                 </div>
               )}
             </div>
@@ -256,7 +265,7 @@ export const RealTimeAnalysisPanel = ({ isActive, onTranscriptUpdate, transcript
             <div className="flex items-center space-x-3">
               <div className="w-3 h-3 bg-green-500 rounded-full animate-pulse"></div>
               <span className="text-green-400 text-sm font-medium">
-                {interimTranscript ? 'Transcribing your speech...' : 'Listening for your voice...'}
+                {currentUserSpeech ? 'Transcribing your speech...' : 'Listening for your voice...'}
               </span>
             </div>
           </CardContent>

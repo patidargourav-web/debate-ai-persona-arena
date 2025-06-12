@@ -14,7 +14,6 @@ const Index = () => {
   const [currentView, setCurrentView] = useState<'home' | 'debate' | 'results' | 'leaderboard'>('home');
   const [isDebating, setIsDebating] = useState(false);
   const [debateData, setDebateData] = useState<DebateResultsData | null>(null);
-  const [transcriptHistory, setTranscriptHistory] = useState<{ speaker: 'AI' | 'Person'; text: string; timestamp: number }[]>([]);
   const { user, loading } = useAuth();
   const navigate = useNavigate();
 
@@ -42,7 +41,6 @@ const Index = () => {
   const startDebate = () => {
     setCurrentView('debate');
     setIsDebating(true);
-    setTranscriptHistory([]);
   };
 
   const endDebate = (results: any) => {
@@ -79,10 +77,6 @@ const Index = () => {
     setCurrentView('results');
   };
 
-  const handleTranscriptUpdate = (newTranscriptHistory: { speaker: 'AI' | 'Person'; text: string; timestamp: number }[]) => {
-    setTranscriptHistory(newTranscriptHistory);
-  };
-
   const renderContent = () => {
     switch (currentView) {
       case 'debate':
@@ -92,14 +86,11 @@ const Index = () => {
               <VideoInterface 
                 isDebating={isDebating} 
                 onEndDebate={endDebate}
-                onTranscriptUpdate={handleTranscriptUpdate}
               />
             </div>
             <div className="w-full lg:w-96 border-t lg:border-t-0 lg:border-l border-border">
               <RealTimeAnalysisPanel 
-                isActive={isDebating} 
-                onTranscriptUpdate={handleTranscriptUpdate}
-                transcriptHistory={transcriptHistory}
+                isActive={isDebating}
               />
             </div>
           </div>
