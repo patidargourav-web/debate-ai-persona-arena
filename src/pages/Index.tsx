@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
@@ -7,11 +8,12 @@ import { RealTimeAnalysisPanel } from '@/components/RealTimeAnalysisPanel';
 import { EnhancedLeaderboard } from '@/components/EnhancedLeaderboard';
 import { EnhancedPostDebateResults } from '@/components/EnhancedPostDebateResults';
 import { Navigation } from '@/components/Navigation';
+import { UserDebatesSection } from '@/components/UserDebatesSection';
 import { useAuth } from '@/contexts/AuthContext';
 import { DebateResultsData } from '@/hooks/useDebateResults';
 
 const Index = () => {
-  const [currentView, setCurrentView] = useState<'home' | 'debate' | 'results' | 'leaderboard'>('home');
+  const [currentView, setCurrentView] = useState<'home' | 'debate' | 'results' | 'leaderboard' | 'user-debates'>('home');
   const [isDebating, setIsDebating] = useState(false);
   const [debateData, setDebateData] = useState<DebateResultsData | null>(null);
   const [transcriptHistory, setTranscriptHistory] = useState<{ speaker: 'AI' | 'Person'; text: string; timestamp: number }[]>([]);
@@ -123,6 +125,17 @@ const Index = () => {
             </div>
           </div>
         );
+      case 'user-debates':
+        return (
+          <div className="min-h-screen bg-background">
+            <div className="container mx-auto px-4 py-6 lg:py-8">
+              <Navigation currentView={currentView} onViewChange={setCurrentView} />
+              <div className="mt-8">
+                <UserDebatesSection />
+              </div>
+            </div>
+          </div>
+        );
       default:
         return (
           <div className="min-h-screen bg-background">
@@ -147,7 +160,13 @@ const Index = () => {
                     onClick={startDebate}
                     className="btn-primary text-lg px-8 py-4 w-full sm:w-auto animate-glow"
                   >
-                    🎯 Start Debate Challenge
+                    🎯 Start AI Debate
+                  </Button>
+                  <Button 
+                    onClick={() => setCurrentView('user-debates')}
+                    className="btn-secondary text-lg px-8 py-4 w-full sm:w-auto"
+                  >
+                    🥊 Challenge Users
                   </Button>
                   <Button 
                     onClick={() => setCurrentView('leaderboard')}
@@ -169,10 +188,10 @@ const Index = () => {
                 </Card>
                 
                 <Card className="card-feature text-center p-6 animate-fade-in" style={{animationDelay: '0.1s'}}>
-                  <div className="text-4xl mb-4 animate-float" style={{animationDelay: '1s'}}>🎤</div>
-                  <h3 className="text-heading text-foreground mb-3">Real-time Analysis</h3>
+                  <div className="text-4xl mb-4 animate-float" style={{animationDelay: '1s'}}>🥊</div>
+                  <h3 className="text-heading text-foreground mb-3">User vs User</h3>
                   <p className="text-body text-muted-foreground">
-                    Live speech recognition with instant feedback on your argumentation skills
+                    Challenge other users in real-time debates and test your skills against human opponents
                   </p>
                 </Card>
                 

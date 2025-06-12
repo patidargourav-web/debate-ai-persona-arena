@@ -6,7 +6,7 @@ import { useNavigate } from 'react-router-dom';
 
 interface NavigationProps {
   currentView: string;
-  onViewChange: (view: 'home' | 'debate' | 'results' | 'leaderboard') => void;
+  onViewChange: (view: 'home' | 'debate' | 'results' | 'leaderboard' | 'user-debates') => void;
 }
 
 export const Navigation = ({ currentView, onViewChange }: NavigationProps) => {
@@ -35,6 +35,13 @@ export const Navigation = ({ currentView, onViewChange }: NavigationProps) => {
             className="text-white"
           >
             Home
+          </Button>
+          <Button
+            variant={currentView === 'user-debates' ? 'default' : 'ghost'}
+            onClick={() => onViewChange('user-debates')}
+            className="text-white"
+          >
+            User Debates
           </Button>
           <Button
             variant={currentView === 'leaderboard' ? 'default' : 'ghost'}

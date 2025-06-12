@@ -9,6 +9,81 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
+      active_debates: {
+        Row: {
+          created_at: string
+          debate_data: Json | null
+          id: string
+          participant_1_id: string
+          participant_2_id: string
+          started_at: string
+          status: string
+          topic: string
+          updated_at: string
+          winner_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          debate_data?: Json | null
+          id?: string
+          participant_1_id: string
+          participant_2_id: string
+          started_at?: string
+          status?: string
+          topic: string
+          updated_at?: string
+          winner_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          debate_data?: Json | null
+          id?: string
+          participant_1_id?: string
+          participant_2_id?: string
+          started_at?: string
+          status?: string
+          topic?: string
+          updated_at?: string
+          winner_id?: string | null
+        }
+        Relationships: []
+      }
+      debate_requests: {
+        Row: {
+          created_at: string
+          expires_at: string
+          id: string
+          message: string | null
+          receiver_id: string
+          sender_id: string
+          status: string
+          topic: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          expires_at?: string
+          id?: string
+          message?: string | null
+          receiver_id: string
+          sender_id: string
+          status?: string
+          topic: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          expires_at?: string
+          id?: string
+          message?: string | null
+          receiver_id?: string
+          sender_id?: string
+          status?: string
+          topic?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       debate_results: {
         Row: {
           comparison: Json
@@ -126,6 +201,30 @@ export type Database = {
           id?: string
           updated_at?: string
           username?: string | null
+        }
+        Relationships: []
+      }
+      user_presence: {
+        Row: {
+          is_online: boolean
+          last_seen: string
+          status: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          is_online?: boolean
+          last_seen?: string
+          status?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          is_online?: boolean
+          last_seen?: string
+          status?: string | null
+          updated_at?: string
+          user_id?: string
         }
         Relationships: []
       }
