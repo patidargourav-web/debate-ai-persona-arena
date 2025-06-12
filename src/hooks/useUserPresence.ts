@@ -1,5 +1,5 @@
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 
@@ -16,6 +16,7 @@ export const useUserPresence = () => {
   const [onlineUsers, setOnlineUsers] = useState<UserPresence[]>([]);
   const [loading, setLoading] = useState(true);
   const { user } = useAuth();
+  const channelRef = useRef<any>(null);
 
   useEffect(() => {
     if (!user) return;
@@ -36,31 +37,57 @@ export const useUserPresence = () => {
 
     // Fetch online users
     const fetchOnlineUsers = async () => {
-      const { data, error } = await supabase
+      // First get presence data
+      const { data: presenceData, error: presenceError } = await supabase
         .from('user_presence')
-        .select(`
-          *,
-          profiles:user_id (username, display_name)
-        `)
+        .select('*')
         .eq('is_online', true)
         .neq('user_id', user.id);
 
-      if (!error && data) {
-        const formattedUsers = data.map(user => ({
-          ...user,
-          username: user.profiles?.username,
-          display_name: user.profiles?.display_name
-        }));
-        setOnlineUsers(formattedUsers);
+      if (presenceError) {
+        console.error('Error fetching presence:', presenceError);
+        setLoading(false);
+        return;
       }
+
+      if (!presenceData || presenceData.length === 0) {
+        setOnlineUsers([]);
+        setLoading(false);
+        return;
+      }
+
+      // Get user profiles separately
+      const userIds = presenceData.map(p => p.user_id);
+      const { data: profilesData } = await supabase
+        .from('profiles')
+        .select('id, username, display_name')
+        .in('id', userIds);
+
+      // Combine presence and profile data
+      const formattedUsers = presenceData.map(presence => {
+        const profile = profilesData?.find(p => p.id === presence.user_id);
+        return {
+          ...presence,
+          status: presence.status as 'available' | 'busy' | 'in_debate',
+          username: profile?.username,
+          display_name: profile?.display_name
+        };
+      });
+
+      setOnlineUsers(formattedUsers);
       setLoading(false);
     };
 
     fetchOnlineUsers();
 
+    // Clean up any existing channel
+    if (channelRef.current) {
+      supabase.removeChannel(channelRef.current);
+    }
+
     // Subscribe to presence changes
-    const channel = supabase
-      .channel('user-presence')
+    channelRef.current = supabase
+      .channel('user-presence-updates')
       .on(
         'postgres_changes',
         {
@@ -94,7 +121,11 @@ export const useUserPresence = () => {
     return () => {
       clearInterval(presenceInterval);
       document.removeEventListener('visibilitychange', handleVisibilityChange);
-      supabase.removeChannel(channel);
+      
+      if (channelRef.current) {
+        supabase.removeChannel(channelRef.current);
+        channelRef.current = null;
+      }
       
       // Set user offline on cleanup
       supabase

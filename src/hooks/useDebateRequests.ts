@@ -1,5 +1,5 @@
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
@@ -28,23 +28,62 @@ export const useDebateRequests = () => {
   const [loading, setLoading] = useState(true);
   const { user } = useAuth();
   const { toast } = useToast();
+  const channelRef = useRef<any>(null);
 
   const fetchRequests = async () => {
     if (!user) return;
 
-    const { data, error } = await supabase
+    // First get debate requests
+    const { data: requestsData, error } = await supabase
       .from('debate_requests')
-      .select(`
-        *,
-        sender_profile:sender_id (username, display_name),
-        receiver_profile:receiver_id (username, display_name)
-      `)
+      .select('*')
       .or(`sender_id.eq.${user.id},receiver_id.eq.${user.id}`)
       .order('created_at', { ascending: false });
 
-    if (!error && data) {
-      setRequests(data);
+    if (error) {
+      console.error('Error fetching requests:', error);
+      setLoading(false);
+      return;
     }
+
+    if (!requestsData || requestsData.length === 0) {
+      setRequests([]);
+      setLoading(false);
+      return;
+    }
+
+    // Get unique user IDs for profiles
+    const userIds = Array.from(new Set([
+      ...requestsData.map(r => r.sender_id),
+      ...requestsData.map(r => r.receiver_id)
+    ]));
+
+    // Fetch profiles separately
+    const { data: profilesData } = await supabase
+      .from('profiles')
+      .select('id, username, display_name')
+      .in('id', userIds);
+
+    // Combine requests with profile data
+    const formattedRequests = requestsData.map(request => {
+      const senderProfile = profilesData?.find(p => p.id === request.sender_id);
+      const receiverProfile = profilesData?.find(p => p.id === request.receiver_id);
+      
+      return {
+        ...request,
+        status: request.status as 'pending' | 'accepted' | 'declined' | 'expired',
+        sender_profile: senderProfile ? {
+          username: senderProfile.username || '',
+          display_name: senderProfile.display_name || ''
+        } : undefined,
+        receiver_profile: receiverProfile ? {
+          username: receiverProfile.username || '',
+          display_name: receiverProfile.display_name || ''
+        } : undefined
+      };
+    });
+
+    setRequests(formattedRequests);
     setLoading(false);
   };
 
@@ -53,9 +92,14 @@ export const useDebateRequests = () => {
 
     if (!user) return;
 
+    // Clean up any existing channel
+    if (channelRef.current) {
+      supabase.removeChannel(channelRef.current);
+    }
+
     // Subscribe to debate request changes
-    const channel = supabase
-      .channel('debate-requests')
+    channelRef.current = supabase
+      .channel('debate-requests-updates')
       .on(
         'postgres_changes',
         {
@@ -78,7 +122,10 @@ export const useDebateRequests = () => {
       .subscribe();
 
     return () => {
-      supabase.removeChannel(channel);
+      if (channelRef.current) {
+        supabase.removeChannel(channelRef.current);
+        channelRef.current = null;
+      }
     };
   }, [user, toast]);
 
