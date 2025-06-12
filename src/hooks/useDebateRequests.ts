@@ -29,6 +29,7 @@ export const useDebateRequests = () => {
   const { user } = useAuth();
   const { toast } = useToast();
   const channelRef = useRef<any>(null);
+  const isSubscribedRef = useRef(false);
 
   const fetchRequests = async () => {
     if (!user) return;
@@ -95,36 +96,46 @@ export const useDebateRequests = () => {
     // Clean up any existing channel
     if (channelRef.current) {
       supabase.removeChannel(channelRef.current);
+      channelRef.current = null;
+      isSubscribedRef.current = false;
     }
 
-    // Subscribe to debate request changes
-    channelRef.current = supabase
-      .channel('debate-requests-updates')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'debate_requests'
-        },
-        (payload) => {
-          fetchRequests();
-          
-          // Show toast for new requests
-          if (payload.eventType === 'INSERT' && payload.new.receiver_id === user.id) {
-            toast({
-              title: "New Debate Request",
-              description: `You received a debate request about "${payload.new.topic}"`,
-            });
+    // Create unique channel name with user ID and timestamp
+    const channelName = `debate-requests-${user.id}-${Date.now()}`;
+
+    // Subscribe to debate request changes only if not already subscribed
+    if (!isSubscribedRef.current) {
+      channelRef.current = supabase
+        .channel(channelName)
+        .on(
+          'postgres_changes',
+          {
+            event: '*',
+            schema: 'public',
+            table: 'debate_requests'
+          },
+          (payload) => {
+            fetchRequests();
+            
+            // Show toast for new requests
+            if (payload.eventType === 'INSERT' && payload.new.receiver_id === user.id) {
+              toast({
+                title: "New Debate Request",
+                description: `You received a debate request about "${payload.new.topic}"`,
+              });
+            }
           }
-        }
-      )
-      .subscribe();
+        )
+        .subscribe();
+      
+      isSubscribedRef.current = true;
+    }
 
     return () => {
-      if (channelRef.current) {
+      if (channelRef.current && isSubscribedRef.current) {
         supabase.removeChannel(channelRef.current);
         channelRef.current = null;
+        isSubscribedRef.current = false;
       }
     };
   }, [user, toast]);

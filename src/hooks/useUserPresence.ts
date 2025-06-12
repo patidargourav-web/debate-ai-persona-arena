@@ -17,6 +17,7 @@ export const useUserPresence = () => {
   const [loading, setLoading] = useState(true);
   const { user } = useAuth();
   const channelRef = useRef<any>(null);
+  const isSubscribedRef = useRef(false);
 
   useEffect(() => {
     if (!user) return;
@@ -83,23 +84,32 @@ export const useUserPresence = () => {
     // Clean up any existing channel
     if (channelRef.current) {
       supabase.removeChannel(channelRef.current);
+      channelRef.current = null;
+      isSubscribedRef.current = false;
     }
 
-    // Subscribe to presence changes
-    channelRef.current = supabase
-      .channel('user-presence-updates')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'user_presence'
-        },
-        () => {
-          fetchOnlineUsers();
-        }
-      )
-      .subscribe();
+    // Create unique channel name with user ID and timestamp
+    const channelName = `user-presence-${user.id}-${Date.now()}`;
+    
+    // Subscribe to presence changes only if not already subscribed
+    if (!isSubscribedRef.current) {
+      channelRef.current = supabase
+        .channel(channelName)
+        .on(
+          'postgres_changes',
+          {
+            event: '*',
+            schema: 'public',
+            table: 'user_presence'
+          },
+          () => {
+            fetchOnlineUsers();
+          }
+        )
+        .subscribe();
+      
+      isSubscribedRef.current = true;
+    }
 
     // Update presence periodically
     const presenceInterval = setInterval(updatePresence, 30000);
@@ -122,9 +132,10 @@ export const useUserPresence = () => {
       clearInterval(presenceInterval);
       document.removeEventListener('visibilitychange', handleVisibilityChange);
       
-      if (channelRef.current) {
+      if (channelRef.current && isSubscribedRef.current) {
         supabase.removeChannel(channelRef.current);
         channelRef.current = null;
+        isSubscribedRef.current = false;
       }
       
       // Set user offline on cleanup
