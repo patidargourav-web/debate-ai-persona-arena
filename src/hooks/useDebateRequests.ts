@@ -129,6 +129,16 @@ export const useDebateRequests = () => {
                 description: `You received a debate request about "${payload.new.topic}"`,
               });
             }
+            
+            // Show toast when request is accepted
+            if (payload.eventType === 'UPDATE' && payload.new.status === 'accepted') {
+              if (payload.new.sender_id === user.id) {
+                toast({
+                  title: "Challenge Accepted! 🎯",
+                  description: "Your debate request was accepted. Get ready to debate!",
+                });
+              }
+            }
           }
         );
 

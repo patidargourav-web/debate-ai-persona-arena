@@ -1,19 +1,43 @@
 
-import React from 'react';
+import React, { useState } from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useDebateRequests } from '@/hooks/useDebateRequests';
 import { useAuth } from '@/contexts/AuthContext';
 import { formatDistanceToNow } from 'date-fns';
+import { UserVsUserDebate } from './UserVsUserDebate';
 
 export const DebateRequests = () => {
   const { requests, loading, respondToRequest } = useDebateRequests();
   const { user } = useAuth();
+  const [activeDebate, setActiveDebate] = useState<any>(null);
 
   const pendingRequests = requests.filter(req => req.status === 'pending');
   const sentRequests = pendingRequests.filter(req => req.sender_id === user?.id);
   const receivedRequests = pendingRequests.filter(req => req.receiver_id === user?.id);
+
+  const handleAcceptRequest = async (request: any) => {
+    const success = await respondToRequest(request.id, 'accepted');
+    if (success) {
+      // Launch the debate interface
+      setActiveDebate(request);
+    }
+  };
+
+  const handleEndDebate = () => {
+    setActiveDebate(null);
+  };
+
+  // If there's an active debate, show the debate interface
+  if (activeDebate) {
+    return (
+      <UserVsUserDebate 
+        debateRequest={activeDebate} 
+        onEndDebate={handleEndDebate}
+      />
+    );
+  }
 
   if (loading) {
     return (
@@ -72,10 +96,10 @@ export const DebateRequests = () => {
                 <div className="flex gap-2">
                   <Button 
                     size="sm" 
-                    onClick={() => respondToRequest(request.id, 'accepted')}
+                    onClick={() => handleAcceptRequest(request)}
                     className="bg-green-600 hover:bg-green-700"
                   >
-                    Accept
+                    🎯 Accept & Start Debate
                   </Button>
                   <Button 
                     size="sm" 
