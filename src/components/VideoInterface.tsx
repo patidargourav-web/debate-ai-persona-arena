@@ -18,6 +18,8 @@ export const VideoInterface = ({ isDebating, onEndDebate, onTranscriptUpdate }: 
   const [error, setError] = useState<string | null>(null);
   const [iframeLoaded, setIframeLoaded] = useState(false);
   const [transcriptHistory, setTranscriptHistory] = useState<{ speaker: 'AI' | 'Person'; text: string; timestamp: number }[]>([]);
+  const [currentUserSpeech, setCurrentUserSpeech] = useState('');
+  const [isUserSpeaking, setIsUserSpeaking] = useState(false);
   const aiVideoRef = useRef<HTMLIFrameElement>(null);
   const conversationCleanupRef = useRef<string | null>(null);
 
@@ -43,25 +45,44 @@ export const VideoInterface = ({ isDebating, onEndDebate, onTranscriptUpdate }: 
     };
   }, [isDebating]);
 
-  // Listen for AI responses from the iframe
+  // Enhanced iframe message handling for AI transcripts
   useEffect(() => {
     const handleMessage = (event: MessageEvent) => {
-      if (event.origin !== 'https://tavus.daily.co') return;
+      // Allow messages from Tavus domains
+      if (!event.origin.includes('tavus') && !event.origin.includes('daily.co')) {
+        return;
+      }
       
       try {
         const data = event.data;
-        if (data.type === 'ai_speech' && data.transcript) {
-          const newEntry = {
-            speaker: 'AI' as const,
-            text: data.transcript,
-            timestamp: Date.now()
-          };
+        console.log('Received iframe message:', data);
+        
+        // Handle different possible AI transcript formats
+        if (data.type === 'ai_speech' || data.type === 'transcript' || data.type === 'speech') {
+          const transcriptText = data.transcript || data.text || data.message;
+          if (transcriptText && transcriptText.trim()) {
+            addAITranscript(transcriptText);
+          }
+        }
+        
+        // Handle Tavus-specific events
+        if (data.event === 'participant_speech' && data.participant_type === 'ai') {
+          const transcriptText = data.transcript || data.text;
+          if (transcriptText && transcriptText.trim()) {
+            addAITranscript(transcriptText);
+          }
+        }
+        
+        // Handle Daily.co events (Tavus uses Daily.co infrastructure)
+        if (data.action === 'transcript-message' && data.data?.is_final) {
+          const transcriptText = data.data.text;
+          const isFromAI = data.data.participant_id !== 'local'; // local is usually the user
           
-          setTranscriptHistory(prev => {
-            const updated = [...prev, newEntry];
-            onTranscriptUpdate?.(updated);
-            return updated;
-          });
+          if (transcriptText && transcriptText.trim()) {
+            if (isFromAI) {
+              addAITranscript(transcriptText);
+            }
+          }
         }
       } catch (error) {
         console.error('Error handling iframe message:', error);
@@ -70,9 +91,31 @@ export const VideoInterface = ({ isDebating, onEndDebate, onTranscriptUpdate }: 
 
     window.addEventListener('message', handleMessage);
     return () => window.removeEventListener('message', handleMessage);
-  }, [onTranscriptUpdate]);
+  }, []);
+
+  const addAITranscript = (text: string) => {
+    console.log('Adding AI transcript:', text);
+    const newEntry = {
+      speaker: 'AI' as const,
+      text: text,
+      timestamp: Date.now()
+    };
+    
+    setTranscriptHistory(prev => {
+      // Avoid duplicate entries
+      const lastEntry = prev[prev.length - 1];
+      if (lastEntry && lastEntry.speaker === 'AI' && lastEntry.text === text) {
+        return prev;
+      }
+      
+      const updated = [...prev, newEntry];
+      onTranscriptUpdate?.(updated);
+      return updated;
+    });
+  };
 
   const addUserTranscript = (text: string) => {
+    console.log('Adding user transcript:', text);
     const newEntry = {
       speaker: 'Person' as const,
       text: text,
@@ -80,17 +123,29 @@ export const VideoInterface = ({ isDebating, onEndDebate, onTranscriptUpdate }: 
     };
     
     setTranscriptHistory(prev => {
+      // Avoid duplicate entries
+      const lastEntry = prev[prev.length - 1];
+      if (lastEntry && lastEntry.speaker === 'Person' && lastEntry.text === text) {
+        return prev;
+      }
+      
       const updated = [...prev, newEntry];
       onTranscriptUpdate?.(updated);
       return updated;
     });
   };
 
-  // Expose function to parent component for user speech
+  // Enhanced global function exposure for speech recognition
   useEffect(() => {
+    // Expose functions globally for speech recognition hook
     (window as any).addUserTranscript = addUserTranscript;
+    (window as any).setCurrentUserSpeech = setCurrentUserSpeech;
+    (window as any).setIsUserSpeaking = setIsUserSpeaking;
+    
     return () => {
       delete (window as any).addUserTranscript;
+      delete (window as any).setCurrentUserSpeech;
+      delete (window as any).setIsUserSpeaking;
     };
   }, []);
 
@@ -165,6 +220,7 @@ export const VideoInterface = ({ isDebating, onEndDebate, onTranscriptUpdate }: 
           properties: {
             max_call_duration: 600,
             participant_left_timeout: 30,
+            enable_transcription: true, // Enable transcription for AI responses
           }
         })
       };
@@ -284,6 +340,7 @@ export const VideoInterface = ({ isDebating, onEndDebate, onTranscriptUpdate }: 
             {loading && <span className="text-yellow-400 ml-2">• Loading AI...</span>}
             {aiPersonaReady && <span className="text-green-400 ml-2">• AI Ready</span>}
             {conversation && !aiPersonaReady && <span className="text-blue-400 ml-2">• Connecting to AI...</span>}
+            {isUserSpeaking && <span className="text-green-400 ml-2">• 🎤 You're speaking</span>}
           </p>
         </div>
         <div className="text-white text-xl font-mono bg-slate-800/50 px-4 py-2 rounded">
@@ -332,19 +389,25 @@ export const VideoInterface = ({ isDebating, onEndDebate, onTranscriptUpdate }: 
               </div>
             )}
             
-            {/* Live transcript overlay */}
-            {transcriptHistory.length > 0 && (
-              <div className="absolute bottom-4 left-4 right-4 bg-slate-900/90 backdrop-blur-sm p-4 rounded-lg max-h-32 overflow-y-auto">
+            {/* Enhanced live transcript overlay */}
+            {(transcriptHistory.length > 0 || currentUserSpeech) && (
+              <div className="absolute bottom-4 left-4 right-4 bg-slate-900/90 backdrop-blur-sm p-4 rounded-lg max-h-40 overflow-y-auto">
                 <p className="text-white text-sm font-semibold mb-2">🎤 Live Conversation:</p>
                 <div className="space-y-1">
                   {transcriptHistory.slice(-3).map((entry, index) => (
                     <p key={index} className="text-sm">
                       <span className={entry.speaker === 'AI' ? 'text-blue-400 font-medium' : 'text-green-400 font-medium'}>
-                        {entry.speaker}:
+                        {entry.speaker === 'AI' ? '🤖 Debatrix' : '👤 You'}:
                       </span>
                       <span className="text-white ml-2">{entry.text}</span>
                     </p>
                   ))}
+                  {currentUserSpeech && (
+                    <p className="text-sm">
+                      <span className="text-green-400 font-medium">👤 You (speaking):</span>
+                      <span className="text-yellow-400 ml-2 italic">{currentUserSpeech}</span>
+                    </p>
+                  )}
                 </div>
               </div>
             )}

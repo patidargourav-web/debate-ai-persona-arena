@@ -1,4 +1,3 @@
-
 import React, { useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
@@ -36,12 +35,23 @@ export const RealTimeAnalysisPanel = ({ isActive, onTranscriptUpdate, transcript
   useEffect(() => {
     if (transcript) {
       analyzeDebateContent(transcript, confidence);
-      // Add user transcript to global function
+      
+      // Add user transcript through global function
       if ((window as any).addUserTranscript) {
         (window as any).addUserTranscript(transcript);
       }
     }
   }, [transcript, confidence, analyzeDebateContent]);
+
+  // Update current speech state for real-time display
+  useEffect(() => {
+    if ((window as any).setCurrentUserSpeech) {
+      (window as any).setCurrentUserSpeech(interimTranscript);
+    }
+    if ((window as any).setIsUserSpeaking) {
+      (window as any).setIsUserSpeaking(isListening && (interimTranscript.length > 0 || transcript.length > 0));
+    }
+  }, [interimTranscript, isListening, transcript]);
 
   const getScoreColor = (score: number) => {
     if (score >= 80) return 'text-green-400';
@@ -60,7 +70,7 @@ export const RealTimeAnalysisPanel = ({ isActive, onTranscriptUpdate, transcript
       <div className="flex items-center justify-between">
         <h2 className="text-xl font-bold text-white">Real-Time Analysis</h2>
         <Badge className={isListening ? 'bg-green-600' : 'bg-gray-600'}>
-          {isListening ? 'Listening' : 'Stopped'}
+          {isListening ? '🎤 Listening' : '⏸️ Stopped'}
         </Badge>
       </div>
 
@@ -76,7 +86,10 @@ export const RealTimeAnalysisPanel = ({ isActive, onTranscriptUpdate, transcript
           </div>
           <Progress value={confidence * 100} className="h-2" />
           {interimTranscript && (
-            <p className="text-xs text-green-400 italic">You: "{interimTranscript}"</p>
+            <p className="text-xs text-green-400 italic">🎤 Speaking: "{interimTranscript}"</p>
+          )}
+          {transcript && (
+            <p className="text-xs text-green-300">✅ Last said: "{transcript.slice(-50)}..."</p>
           )}
         </CardContent>
       </Card>
@@ -195,46 +208,56 @@ export const RealTimeAnalysisPanel = ({ isActive, onTranscriptUpdate, transcript
         </CardContent>
       </Card>
 
-      {/* Conversation History */}
+      {/* Enhanced Conversation History */}
       {transcriptHistory.length > 0 && (
         <Card className="bg-slate-800/50 backdrop-blur-sm border-blue-500/30">
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm text-white">Conversation History</CardTitle>
+            <CardTitle className="text-sm text-white flex items-center justify-between">
+              <span>💬 Live Transcript</span>
+              <Badge variant="outline" className="text-xs">
+                {transcriptHistory.length} exchanges
+              </Badge>
+            </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="max-h-40 overflow-y-auto text-xs space-y-2 bg-slate-900/50 p-3 rounded">
+            <div className="max-h-48 overflow-y-auto text-xs space-y-3 bg-slate-900/50 p-3 rounded">
               {transcriptHistory.map((entry, index) => (
-                <div key={index} className="flex flex-col space-y-1">
-                  <div className="flex items-center space-x-2">
-                    <span className={`font-medium ${
+                <div key={index} className="border-l-2 border-slate-600 pl-3">
+                  <div className="flex items-center justify-between mb-1">
+                    <span className={`font-medium text-sm ${
                       entry.speaker === 'AI' ? 'text-blue-400' : 'text-green-400'
                     }`}>
-                      {entry.speaker === 'AI' ? '🤖 Debatrix' : '👤 You'}:
+                      {entry.speaker === 'AI' ? '🤖 Debatrix AI' : '👤 You'}
                     </span>
                     <span className="text-xs text-slate-400">
                       {new Date(entry.timestamp).toLocaleTimeString()}
                     </span>
                   </div>
-                  <p className="text-white text-sm ml-4">{entry.text}</p>
+                  <p className="text-white text-sm leading-relaxed">{entry.text}</p>
                 </div>
               ))}
+              {interimTranscript && (
+                <div className="border-l-2 border-green-400 pl-3 bg-green-900/20 rounded-r">
+                  <span className="font-medium text-sm text-green-400">
+                    👤 You (speaking):
+                  </span>
+                  <p className="text-yellow-400 text-sm italic leading-relaxed">{interimTranscript}</p>
+                </div>
+              )}
             </div>
           </CardContent>
         </Card>
       )}
 
-      {/* Current User Input */}
-      {(transcript || interimTranscript) && (
+      {/* Real-time Speech Indicator */}
+      {isListening && (
         <Card className="bg-slate-800/50 backdrop-blur-sm border-green-500/30">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm text-white">Your Current Speech</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="max-h-24 overflow-y-auto text-xs text-slate-300 bg-slate-900/50 p-2 rounded">
-              {transcript && <p className="text-green-400">Confirmed: {transcript}</p>}
-              {interimTranscript && (
-                <p className="text-yellow-400 italic">Speaking: {interimTranscript}</p>
-              )}
+          <CardContent className="pt-4">
+            <div className="flex items-center space-x-3">
+              <div className="w-3 h-3 bg-green-500 rounded-full animate-pulse"></div>
+              <span className="text-green-400 text-sm font-medium">
+                {interimTranscript ? 'Transcribing your speech...' : 'Listening for your voice...'}
+              </span>
             </div>
           </CardContent>
         </Card>
