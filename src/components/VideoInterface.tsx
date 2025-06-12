@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import { useTranscription } from '@/hooks/useTranscription';
+import { Mic, MicOff } from 'lucide-react';
 
 interface VideoInterfaceProps {
   isDebating: boolean;
@@ -17,16 +17,9 @@ export const VideoInterface = ({ isDebating, onEndDebate, onTranscriptUpdate }: 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [iframeLoaded, setIframeLoaded] = useState(false);
+  const [transcriptHistory, setTranscriptHistory] = useState<{ speaker: 'AI' | 'Person'; text: string; timestamp: number }[]>([]);
   const aiVideoRef = useRef<HTMLIFrameElement>(null);
   const conversationCleanupRef = useRef<string | null>(null);
-
-  const {
-    transcriptHistory,
-    currentUserSpeech,
-    isUserSpeaking,
-    addAITranscript,
-    clearHistory
-  } = useTranscription();
 
   const TAVUS_API_KEY = '75f20ee320cc44bbbe0b8dd2cf21f3b5';
   const PERSONA_ID = 'p30ebea6917c';
@@ -50,66 +43,56 @@ export const VideoInterface = ({ isDebating, onEndDebate, onTranscriptUpdate }: 
     };
   }, [isDebating]);
 
-  // Enhanced iframe message handling for AI transcripts
+  // Listen for AI responses from the iframe
   useEffect(() => {
     const handleMessage = (event: MessageEvent) => {
-      // More permissive origin checking for Tavus
-      const allowedOrigins = ['tavus', 'daily.co', 'localhost', '127.0.0.1'];
-      const isAllowedOrigin = allowedOrigins.some(origin => 
-        event.origin.includes(origin) || event.origin === window.location.origin
-      );
-      
-      if (!isAllowedOrigin) {
-        return;
-      }
+      if (event.origin !== 'https://tavus.daily.co') return;
       
       try {
         const data = event.data;
-        console.log('VideoInterface: Received iframe message:', data);
-        
-        // Handle multiple possible AI transcript formats
-        let transcriptText = '';
-        
-        if (data.type === 'ai_speech' || data.type === 'ai_transcript') {
-          transcriptText = data.transcript || data.text || data.message;
-        } else if (data.type === 'transcript' && data.source === 'ai') {
-          transcriptText = data.text || data.transcript;
-        } else if (data.event === 'participant_speech' && data.participant_type === 'ai') {
-          transcriptText = data.transcript || data.text;
-        } else if (data.action === 'transcript-message' && data.data?.is_final) {
-          const isFromAI = data.data.participant_id !== 'local';
-          if (isFromAI) {
-            transcriptText = data.data.text;
-          }
-        } else if (data.type === 'message' && data.from === 'ai') {
-          transcriptText = data.content || data.text;
-        }
-        
-        // Also try to capture any message that might contain AI speech
-        if (!transcriptText && data.message && typeof data.message === 'string') {
-          // Only consider it AI speech if it doesn't look like user speech
-          if (!data.message.includes('user') && !data.message.includes('person')) {
-            transcriptText = data.message;
-          }
-        }
-        
-        if (transcriptText && transcriptText.trim()) {
-          console.log('VideoInterface: Processing AI transcript:', transcriptText);
-          addAITranscript(transcriptText);
+        if (data.type === 'ai_speech' && data.transcript) {
+          const newEntry = {
+            speaker: 'AI' as const,
+            text: data.transcript,
+            timestamp: Date.now()
+          };
+          
+          setTranscriptHistory(prev => {
+            const updated = [...prev, newEntry];
+            onTranscriptUpdate?.(updated);
+            return updated;
+          });
         }
       } catch (error) {
-        console.error('VideoInterface: Error handling iframe message:', error);
+        console.error('Error handling iframe message:', error);
       }
     };
 
     window.addEventListener('message', handleMessage);
     return () => window.removeEventListener('message', handleMessage);
-  }, [addAITranscript]);
+  }, [onTranscriptUpdate]);
 
-  // Notify parent component of transcript updates
+  const addUserTranscript = (text: string) => {
+    const newEntry = {
+      speaker: 'Person' as const,
+      text: text,
+      timestamp: Date.now()
+    };
+    
+    setTranscriptHistory(prev => {
+      const updated = [...prev, newEntry];
+      onTranscriptUpdate?.(updated);
+      return updated;
+    });
+  };
+
+  // Expose function to parent component for user speech
   useEffect(() => {
-    onTranscriptUpdate?.(transcriptHistory);
-  }, [transcriptHistory, onTranscriptUpdate]);
+    (window as any).addUserTranscript = addUserTranscript;
+    return () => {
+      delete (window as any).addUserTranscript;
+    };
+  }, []);
 
   const cleanup = async () => {
     if (conversationCleanupRef.current) {
@@ -182,8 +165,6 @@ export const VideoInterface = ({ isDebating, onEndDebate, onTranscriptUpdate }: 
           properties: {
             max_call_duration: 600,
             participant_left_timeout: 30,
-            enable_transcription: true,
-            enable_recording: true,
           }
         })
       };
@@ -226,7 +207,6 @@ export const VideoInterface = ({ isDebating, onEndDebate, onTranscriptUpdate }: 
       console.log('Initializing AI persona...');
       setError(null);
       setIframeLoaded(false);
-      clearHistory(); // Clear previous session data
       
       await getPersona();
       const conversationData = await createConversation();
@@ -304,7 +284,6 @@ export const VideoInterface = ({ isDebating, onEndDebate, onTranscriptUpdate }: 
             {loading && <span className="text-yellow-400 ml-2">• Loading AI...</span>}
             {aiPersonaReady && <span className="text-green-400 ml-2">• AI Ready</span>}
             {conversation && !aiPersonaReady && <span className="text-blue-400 ml-2">• Connecting to AI...</span>}
-            {isUserSpeaking && <span className="text-green-400 ml-2">• 🎤 You're speaking</span>}
           </p>
         </div>
         <div className="text-white text-xl font-mono bg-slate-800/50 px-4 py-2 rounded">
@@ -354,24 +333,18 @@ export const VideoInterface = ({ isDebating, onEndDebate, onTranscriptUpdate }: 
             )}
             
             {/* Live transcript overlay */}
-            {(transcriptHistory.length > 0 || currentUserSpeech) && (
-              <div className="absolute bottom-4 left-4 right-4 bg-slate-900/90 backdrop-blur-sm p-4 rounded-lg max-h-40 overflow-y-auto">
+            {transcriptHistory.length > 0 && (
+              <div className="absolute bottom-4 left-4 right-4 bg-slate-900/90 backdrop-blur-sm p-4 rounded-lg max-h-32 overflow-y-auto">
                 <p className="text-white text-sm font-semibold mb-2">🎤 Live Conversation:</p>
                 <div className="space-y-1">
                   {transcriptHistory.slice(-3).map((entry, index) => (
                     <p key={index} className="text-sm">
                       <span className={entry.speaker === 'AI' ? 'text-blue-400 font-medium' : 'text-green-400 font-medium'}>
-                        {entry.speaker === 'AI' ? '🤖 Debatrix' : '👤 You'}:
+                        {entry.speaker}:
                       </span>
                       <span className="text-white ml-2">{entry.text}</span>
                     </p>
                   ))}
-                  {currentUserSpeech && (
-                    <p className="text-sm">
-                      <span className="text-green-400 font-medium">👤 You (speaking):</span>
-                      <span className="text-yellow-400 ml-2 italic">{currentUserSpeech}</span>
-                    </p>
-                  )}
                 </div>
               </div>
             )}
