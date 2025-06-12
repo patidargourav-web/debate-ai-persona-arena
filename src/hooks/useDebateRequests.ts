@@ -29,7 +29,6 @@ export const useDebateRequests = () => {
   const { user } = useAuth();
   const { toast } = useToast();
   const channelRef = useRef<any>(null);
-  const isSubscribedRef = useRef(false);
 
   const fetchRequests = async () => {
     if (!user) return;
@@ -93,19 +92,25 @@ export const useDebateRequests = () => {
 
     if (!user) return;
 
-    // Clean up any existing channel
-    if (channelRef.current) {
-      supabase.removeChannel(channelRef.current);
-      channelRef.current = null;
-      isSubscribedRef.current = false;
-    }
+    // Clean up any existing channel completely
+    const cleanupChannel = async () => {
+      if (channelRef.current) {
+        try {
+          await channelRef.current.unsubscribe();
+          supabase.removeChannel(channelRef.current);
+        } catch (error) {
+          // Ignore cleanup errors
+        }
+        channelRef.current = null;
+      }
+    };
 
-    // Create unique channel name with user ID and timestamp
-    const channelName = `debate-requests-${user.id}-${Date.now()}`;
+    cleanupChannel().then(() => {
+      // Create unique channel name
+      const channelName = `debate-requests-${user.id}-${Math.random().toString(36).substring(7)}`;
 
-    // Subscribe to debate request changes only if not already subscribed
-    if (!isSubscribedRef.current) {
-      channelRef.current = supabase
+      // Subscribe to debate request changes
+      const channel = supabase
         .channel(channelName)
         .on(
           'postgres_changes',
@@ -125,17 +130,21 @@ export const useDebateRequests = () => {
               });
             }
           }
-        )
-        .subscribe();
-      
-      isSubscribedRef.current = true;
-    }
+        );
+
+      channelRef.current = channel;
+      channel.subscribe();
+    });
 
     return () => {
-      if (channelRef.current && isSubscribedRef.current) {
-        supabase.removeChannel(channelRef.current);
+      if (channelRef.current) {
+        try {
+          channelRef.current.unsubscribe();
+          supabase.removeChannel(channelRef.current);
+        } catch (error) {
+          // Ignore cleanup errors
+        }
         channelRef.current = null;
-        isSubscribedRef.current = false;
       }
     };
   }, [user, toast]);
