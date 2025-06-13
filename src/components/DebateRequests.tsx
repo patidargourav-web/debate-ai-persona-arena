@@ -1,4 +1,3 @@
-
 import React, { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Card } from '@/components/ui/card';
@@ -8,50 +7,40 @@ import { useDebateRequests } from '@/hooks/useDebateRequests';
 import { useAuth } from '@/contexts/AuthContext';
 import { formatDistanceToNow } from 'date-fns';
 import { supabase } from '@/integrations/supabase/client';
-
 export const DebateRequests = () => {
   const {
     requests,
     loading,
     respondToRequest
   } = useDebateRequests();
-  const { user } = useAuth();
+  const {
+    user
+  } = useAuth();
   const navigate = useNavigate();
 
   // Listen for accepted requests to auto-redirect both users
   useEffect(() => {
     if (!user) return;
-
-    const channel = supabase
-      .channel(`debate-redirect-${user.id}`)
-      .on(
-        'postgres_changes',
-        {
-          event: 'UPDATE',
-          schema: 'public',
-          table: 'debate_requests',
-          filter: `status=eq.accepted`
-        },
-        (payload) => {
-          const request = payload.new;
-          // Redirect if this user is involved in the accepted debate
-          if (request.sender_id === user.id || request.receiver_id === user.id) {
-            console.log('Debate accepted, redirecting to debate page:', request.id);
-            navigate(`/debate/${request.id}`);
-          }
-        }
-      )
-      .subscribe();
-
+    const channel = supabase.channel(`debate-redirect-${user.id}`).on('postgres_changes', {
+      event: 'UPDATE',
+      schema: 'public',
+      table: 'debate_requests',
+      filter: `status=eq.accepted`
+    }, payload => {
+      const request = payload.new;
+      // Redirect if this user is involved in the accepted debate
+      if (request.sender_id === user.id || request.receiver_id === user.id) {
+        console.log('Debate accepted, redirecting to debate page:', request.id);
+        navigate(`/debate/${request.id}`);
+      }
+    }).subscribe();
     return () => {
       supabase.removeChannel(channel);
     };
   }, [user, navigate]);
-
   const pendingRequests = requests.filter(req => req.status === 'pending');
   const sentRequests = pendingRequests.filter(req => req.sender_id === user?.id);
   const receivedRequests = pendingRequests.filter(req => req.receiver_id === user?.id);
-
   const handleAcceptRequest = async (request: any) => {
     const success = await respondToRequest(request.id, 'accepted');
     if (success) {
@@ -69,7 +58,6 @@ export const DebateRequests = () => {
         </div>
       </Card>;
   }
-
   return <Card className="p-6">
       <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
         📬 Debate Requests
@@ -80,7 +68,7 @@ export const DebateRequests = () => {
       {receivedRequests.length > 0 && <div className="mb-6">
           <h4 className="text-sm font-medium text-muted-foreground mb-3">📥 Incoming Requests</h4>
           <div className="space-y-3">
-            {receivedRequests.map(request => <div key={request.id} className="border rounded-lg p-4 bg-blue-50/50">
+            {receivedRequests.map(request => <div key={request.id} className="border rounded-lg p-4 bg-slate-950">
                 <div className="flex justify-between items-start mb-2">
                   <div>
                     <p className="font-medium">
