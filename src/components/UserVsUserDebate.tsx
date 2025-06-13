@@ -155,17 +155,19 @@ export const UserVsUserDebate = ({ debateRequest, onEndDebate }: UserVsUserDebat
     
     const winnerId = myScore > opponentScore ? user?.id : opponentId;
     
-    // Update active debate with results
+    // Update active debate with results - fix JSON serialization
+    const debateDataJson = JSON.stringify({
+      scores: userScores,
+      duration: debateTimer,
+      final_scores: { [user?.id || '']: myScore, [opponentId]: opponentScore }
+    });
+
     await supabase
       .from('active_debates')
       .update({
         status: 'completed',
         winner_id: winnerId,
-        debate_data: {
-          scores: userScores,
-          duration: debateTimer,
-          final_scores: { [user?.id || '']: myScore, [opponentId]: opponentScore }
-        }
+        debate_data: debateDataJson
       })
       .eq('participant_1_id', debateRequest.sender_id)
       .eq('participant_2_id', debateRequest.receiver_id);

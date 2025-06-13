@@ -9,7 +9,7 @@ interface DebateSession {
   participant_1_id: string;
   participant_2_id: string;
   topic: string;
-  status: 'active' | 'completed';
+  status: string;
   started_at: string;
   winner_id?: string;
   debate_data?: any;
@@ -33,7 +33,7 @@ export const useDebateSession = (sessionId?: string) => {
         .single();
 
       if (!error && data) {
-        setSession(data);
+        setSession(data as DebateSession);
       }
       setLoading(false);
     };
