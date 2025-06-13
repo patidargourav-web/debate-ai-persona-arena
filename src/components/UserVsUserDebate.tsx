@@ -43,8 +43,11 @@ export const UserVsUserDebate = ({ debateId, onEndDebate }: UserVsUserDebateProp
   const [loading, setLoading] = useState(true);
   const [userScores, setUserScores] = useState<Record<string, DebaterScore>>({});
   const [activeDebater, setActiveDebater] = useState<string | null>(null);
+  const [isConnected, setIsConnected] = useState(false);
+  const [opponentConnected, setOpponentConnected] = useState(false);
   const { user } = useAuth();
   const { toast } = useToast();
+  const channelRef = useRef<any>(null);
 
   useEffect(() => {
     fetchDebateRequest();
@@ -53,6 +56,7 @@ export const UserVsUserDebate = ({ debateId, onEndDebate }: UserVsUserDebateProp
   useEffect(() => {
     if (debateRequest && user) {
       initializeScores();
+      setupRealTimeConnection();
       startDebate();
     }
   }, [debateRequest, user]);
@@ -62,10 +66,83 @@ export const UserVsUserDebate = ({ debateId, onEndDebate }: UserVsUserDebateProp
       const interval = setInterval(() => {
         setDebateTimer(prev => prev + 1);
         updateScores();
+        
+        // Simulate speaking turns
+        if (Math.random() > 0.7) {
+          const participants = [debateRequest?.sender_id, debateRequest?.receiver_id];
+          setActiveDebater(participants[Math.floor(Math.random() * participants.length)] || null);
+        }
       }, 1000);
       return () => clearInterval(interval);
     }
-  }, [isDebating]);
+  }, [isDebating, debateRequest]);
+
+  const setupRealTimeConnection = () => {
+    if (!user || !debateRequest) return;
+
+    // Clean up existing channel
+    if (channelRef.current) {
+      supabase.removeChannel(channelRef.current);
+    }
+
+    const channel = supabase
+      .channel(`debate-room-${debateId}`)
+      .on('presence', { event: 'sync' }, () => {
+        const newState = channel.presenceState();
+        console.log('Users in debate room:', newState);
+        
+        // Check if opponent is connected
+        const opponentId = user.id === debateRequest.sender_id ? debateRequest.receiver_id : debateRequest.sender_id;
+        const opponentPresent = Object.keys(newState).some(key => 
+          newState[key].some((presence: any) => presence.user_id === opponentId)
+        );
+        setOpponentConnected(opponentPresent);
+      })
+      .on('presence', { event: 'join' }, ({ key, newPresences }) => {
+        console.log('User joined:', key, newPresences);
+        toast({
+          title: "User Joined",
+          description: "Your opponent has joined the debate room!",
+        });
+      })
+      .on('presence', { event: 'leave' }, ({ key, leftPresences }) => {
+        console.log('User left:', key, leftPresences);
+        toast({
+          title: "User Left",
+          description: "Your opponent has left the debate room.",
+          variant: "destructive"
+        });
+      })
+      .on('broadcast', { event: 'score_update' }, (payload) => {
+        const { userId, scores } = payload.payload;
+        if (userId !== user.id) {
+          setUserScores(prev => ({
+            ...prev,
+            [userId]: scores
+          }));
+        }
+      })
+      .on('broadcast', { event: 'speaking_status' }, (payload) => {
+        const { userId, isSpeaking } = payload.payload;
+        if (isSpeaking) {
+          setActiveDebater(userId);
+        }
+      });
+
+    channelRef.current = channel;
+    
+    channel.subscribe(async (status) => {
+      if (status === 'SUBSCRIBED') {
+        setIsConnected(true);
+        // Track user presence
+        await channel.track({
+          user_id: user.id,
+          username: user.email,
+          online_at: new Date().toISOString(),
+        });
+      }
+    });
+  };
 
   const fetchDebateRequest = async () => {
     try {
@@ -137,12 +214,12 @@ export const UserVsUserDebate = ({ debateId, onEndDebate }: UserVsUserDebateProp
     if (!user || !debateRequest) return;
 
     const newScores: DebaterScore = {
-      argumentStrength: Math.min(100, userScores[user.id]?.argumentStrength + Math.random() * 3),
-      clarity: Math.min(100, userScores[user.id]?.clarity + Math.random() * 2),
-      engagement: Math.min(100, userScores[user.id]?.engagement + Math.random() * 2.5),
+      argumentStrength: Math.min(100, (userScores[user.id]?.argumentStrength || 0) + Math.random() * 3),
+      clarity: Math.min(100, (userScores[user.id]?.clarity || 0) + Math.random() * 2),
+      engagement: Math.min(100, (userScores[user.id]?.engagement || 0) + Math.random() * 2.5),
       overallScore: 0,
-      fillerWords: userScores[user.id]?.fillerWords + (Math.random() > 0.85 ? 1 : 0),
-      speakingTime: userScores[user.id]?.speakingTime + (activeDebater === user.id ? 1 : 0)
+      fillerWords: (userScores[user.id]?.fillerWords || 0) + (Math.random() > 0.85 ? 1 : 0),
+      speakingTime: (userScores[user.id]?.speakingTime || 0) + (activeDebater === user.id ? 1 : 0)
     };
     
     newScores.overallScore = Math.round(
@@ -155,12 +232,13 @@ export const UserVsUserDebate = ({ debateId, onEndDebate }: UserVsUserDebateProp
     }));
 
     // Broadcast scores to other user
-    supabase.channel(`debate-room-${debateId}`)
-      .send({
+    if (channelRef.current) {
+      channelRef.current.send({
         type: 'broadcast',
         event: 'score_update',
         payload: { userId: user.id, scores: newScores }
       });
+    }
   };
 
   const startDebate = () => {
@@ -209,6 +287,11 @@ export const UserVsUserDebate = ({ debateId, onEndDebate }: UserVsUserDebateProp
       })
       .eq('participant_1_id', debateRequest.sender_id)
       .eq('participant_2_id', debateRequest.receiver_id);
+
+    // Clean up real-time connection
+    if (channelRef.current) {
+      supabase.removeChannel(channelRef.current);
+    }
 
     toast({
       title: myScore > opponentScore ? "You Won! 🏆" : "Good Effort! 🎯",
@@ -275,6 +358,16 @@ export const UserVsUserDebate = ({ debateId, onEndDebate }: UserVsUserDebateProp
           <p className="text-sm text-slate-400">
             Topic: {debateRequest.topic}
           </p>
+          <div className="flex items-center gap-4 text-xs">
+            <span className={`flex items-center gap-1 ${isConnected ? 'text-green-400' : 'text-red-400'}`}>
+              <div className={`w-2 h-2 rounded-full ${isConnected ? 'bg-green-400' : 'bg-red-400'}`}></div>
+              {isConnected ? 'Connected' : 'Connecting...'}
+            </span>
+            <span className={`flex items-center gap-1 ${opponentConnected ? 'text-green-400' : 'text-yellow-400'}`}>
+              <div className={`w-2 h-2 rounded-full ${opponentConnected ? 'bg-green-400' : 'bg-yellow-400'}`}></div>
+              {opponentConnected ? 'Opponent Online' : 'Waiting for opponent...'}
+            </span>
+          </div>
         </div>
         <div className="flex items-center gap-4">
           <div className="text-white text-xl font-mono bg-slate-800/50 px-4 py-2 rounded">
@@ -294,17 +387,25 @@ export const UserVsUserDebate = ({ debateId, onEndDebate }: UserVsUserDebateProp
             <Card className="bg-slate-800/50 backdrop-blur-sm border-blue-500/30 p-4">
               <div className="flex items-center justify-between mb-2">
                 <h3 className="text-white font-semibold">You</h3>
-                <Badge className={activeDebater === user?.id ? 'bg-green-600' : 'bg-gray-600'}>
-                  {activeDebater === user?.id ? 'Speaking' : 'Listening'}
-                </Badge>
+                <div className="flex items-center gap-2">
+                  <Badge className={activeDebater === user?.id ? 'bg-green-600' : 'bg-gray-600'}>
+                    {activeDebater === user?.id ? 'Speaking' : 'Listening'}
+                  </Badge>
+                  <div className={`w-2 h-2 rounded-full ${isConnected ? 'bg-green-400 animate-pulse' : 'bg-red-400'}`}></div>
+                </div>
               </div>
-              <div className="aspect-video bg-gradient-to-br from-blue-600/20 to-purple-600/20 rounded-lg flex items-center justify-center">
+              <div className="aspect-video bg-gradient-to-br from-blue-600/20 to-purple-600/20 rounded-lg flex items-center justify-center relative">
                 <div className="text-center">
                   <div className="w-24 h-24 bg-gradient-to-br from-blue-500 to-purple-500 rounded-full flex items-center justify-center text-2xl mb-2 mx-auto">
                     👤
                   </div>
                   <p className="text-white">Your Camera</p>
                 </div>
+                {activeDebater === user?.id && (
+                  <div className="absolute top-2 right-2 bg-red-500 text-white px-2 py-1 rounded text-xs animate-pulse">
+                    🎤 LIVE
+                  </div>
+                )}
               </div>
               
               {/* User's Score */}
@@ -321,17 +422,28 @@ export const UserVsUserDebate = ({ debateId, onEndDebate }: UserVsUserDebateProp
             <Card className="bg-slate-800/50 backdrop-blur-sm border-purple-500/30 p-4">
               <div className="flex items-center justify-between mb-2">
                 <h3 className="text-white font-semibold">{getOpponentName()}</h3>
-                <Badge className={activeDebater === getOpponentId() ? 'bg-green-600' : 'bg-gray-600'}>
-                  {activeDebater === getOpponentId() ? 'Speaking' : 'Listening'}
-                </Badge>
+                <div className="flex items-center gap-2">
+                  <Badge className={activeDebater === getOpponentId() ? 'bg-green-600' : 'bg-gray-600'}>
+                    {activeDebater === getOpponentId() ? 'Speaking' : 'Listening'}
+                  </Badge>
+                  <div className={`w-2 h-2 rounded-full ${opponentConnected ? 'bg-green-400 animate-pulse' : 'bg-yellow-400'}`}></div>
+                </div>
               </div>
-              <div className="aspect-video bg-gradient-to-br from-purple-600/20 to-pink-600/20 rounded-lg flex items-center justify-center">
+              <div className="aspect-video bg-gradient-to-br from-purple-600/20 to-pink-600/20 rounded-lg flex items-center justify-center relative">
                 <div className="text-center">
                   <div className="w-24 h-24 bg-gradient-to-br from-purple-500 to-pink-500 rounded-full flex items-center justify-center text-2xl mb-2 mx-auto">
                     👤
                   </div>
                   <p className="text-white">{getOpponentName()}</p>
+                  {!opponentConnected && (
+                    <p className="text-yellow-400 text-xs mt-2">Waiting to connect...</p>
+                  )}
                 </div>
+                {activeDebater === getOpponentId() && (
+                  <div className="absolute top-2 right-2 bg-red-500 text-white px-2 py-1 rounded text-xs animate-pulse">
+                    🎤 LIVE
+                  </div>
+                )}
               </div>
               
               {/* Opponent's Score */}
@@ -350,8 +462,29 @@ export const UserVsUserDebate = ({ debateId, onEndDebate }: UserVsUserDebateProp
         <div className="w-full lg:w-80 bg-slate-900/50 border-l border-slate-700 p-4 overflow-y-auto">
           <h3 className="text-white font-semibold mb-4 flex items-center gap-2">
             📊 Live Analysis
-            <Badge variant="outline">Real-time</Badge>
+            <Badge variant="outline" className={isConnected ? 'border-green-500 text-green-400' : 'border-red-500 text-red-400'}>
+              {isConnected ? 'Real-time' : 'Offline'}
+            </Badge>
           </h3>
+
+          {/* Connection Status */}
+          <Card className="bg-slate-800/50 border-slate-600 p-3 mb-4">
+            <h4 className="text-white font-medium mb-2 text-sm">Connection Status</h4>
+            <div className="space-y-1 text-xs">
+              <div className="flex justify-between">
+                <span className="text-slate-300">You</span>
+                <span className={isConnected ? 'text-green-400' : 'text-red-400'}>
+                  {isConnected ? '🟢 Connected' : '🔴 Disconnected'}
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-300">{getOpponentName()}</span>
+                <span className={opponentConnected ? 'text-green-400' : 'text-yellow-400'}>
+                  {opponentConnected ? '🟢 Connected' : '🟡 Waiting...'}
+                </span>
+              </div>
+            </div>
+          </Card>
 
           {/* Score Comparison */}
           <Card className="bg-slate-800/50 border-slate-600 p-4 mb-4">

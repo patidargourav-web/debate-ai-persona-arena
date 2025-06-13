@@ -1,4 +1,5 @@
-import React from 'react';
+
+import React, { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -6,6 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { useDebateRequests } from '@/hooks/useDebateRequests';
 import { useAuth } from '@/contexts/AuthContext';
 import { formatDistanceToNow } from 'date-fns';
+import { supabase } from '@/integrations/supabase/client';
 
 export const DebateRequests = () => {
   const {
@@ -16,6 +18,36 @@ export const DebateRequests = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
 
+  // Listen for accepted requests to auto-redirect both users
+  useEffect(() => {
+    if (!user) return;
+
+    const channel = supabase
+      .channel(`debate-redirect-${user.id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'debate_requests',
+          filter: `status=eq.accepted`
+        },
+        (payload) => {
+          const request = payload.new;
+          // Redirect if this user is involved in the accepted debate
+          if (request.sender_id === user.id || request.receiver_id === user.id) {
+            console.log('Debate accepted, redirecting to debate page:', request.id);
+            navigate(`/debate/${request.id}`);
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [user, navigate]);
+
   const pendingRequests = requests.filter(req => req.status === 'pending');
   const sentRequests = pendingRequests.filter(req => req.sender_id === user?.id);
   const receivedRequests = pendingRequests.filter(req => req.receiver_id === user?.id);
@@ -23,8 +55,8 @@ export const DebateRequests = () => {
   const handleAcceptRequest = async (request: any) => {
     const success = await respondToRequest(request.id, 'accepted');
     if (success) {
-      // Navigate to the dedicated debate page
-      navigate(`/debate/${request.id}`);
+      // The redirect will happen automatically via the real-time listener
+      console.log('Request accepted, waiting for redirect...');
     }
   };
 
