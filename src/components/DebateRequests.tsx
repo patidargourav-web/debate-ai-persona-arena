@@ -1,39 +1,34 @@
-import React, { useState } from 'react';
+import React from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useDebateRequests } from '@/hooks/useDebateRequests';
 import { useAuth } from '@/contexts/AuthContext';
 import { formatDistanceToNow } from 'date-fns';
-import { UserVsUserDebate } from './UserVsUserDebate';
+
 export const DebateRequests = () => {
   const {
     requests,
     loading,
     respondToRequest
   } = useDebateRequests();
-  const {
-    user
-  } = useAuth();
-  const [activeDebate, setActiveDebate] = useState<any>(null);
+  const { user } = useAuth();
+  const navigate = useNavigate();
+
   const pendingRequests = requests.filter(req => req.status === 'pending');
   const sentRequests = pendingRequests.filter(req => req.sender_id === user?.id);
   const receivedRequests = pendingRequests.filter(req => req.receiver_id === user?.id);
+
   const handleAcceptRequest = async (request: any) => {
     const success = await respondToRequest(request.id, 'accepted');
     if (success) {
-      // Launch the debate interface
-      setActiveDebate(request);
+      // Navigate to the dedicated debate page
+      navigate(`/debate/${request.id}`);
     }
-  };
-  const handleEndDebate = () => {
-    setActiveDebate(null);
   };
 
   // If there's an active debate, show the debate interface
-  if (activeDebate) {
-    return <UserVsUserDebate debateRequest={activeDebate} onEndDebate={handleEndDebate} />;
-  }
   if (loading) {
     return <Card className="p-6">
         <h3 className="text-lg font-semibold mb-4">📬 Debate Requests</h3>
@@ -42,6 +37,7 @@ export const DebateRequests = () => {
         </div>
       </Card>;
   }
+
   return <Card className="p-6">
       <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
         📬 Debate Requests

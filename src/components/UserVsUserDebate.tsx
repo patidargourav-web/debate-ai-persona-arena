@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -9,20 +8,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 
 interface UserVsUserDebateProps {
-  debateRequest: {
-    id: string;
-    topic: string;
-    sender_id: string;
-    receiver_id: string;
-    sender_profile?: {
-      username: string;
-      display_name: string;
-    };
-    receiver_profile?: {
-      username: string;
-      display_name: string;
-    };
-  };
+  debateId: string;
   onEndDebate: () => void;
 }
 
@@ -35,70 +21,120 @@ interface DebaterScore {
   speakingTime: number;
 }
 
-export const UserVsUserDebate = ({ debateRequest, onEndDebate }: UserVsUserDebateProps) => {
+interface DebateRequestWithProfiles {
+  id: string;
+  topic: string;
+  sender_id: string;
+  receiver_id: string;
+  sender_profile?: {
+    username: string;
+    display_name: string;
+  };
+  receiver_profile?: {
+    username: string;
+    display_name: string;
+  };
+}
+
+export const UserVsUserDebate = ({ debateId, onEndDebate }: UserVsUserDebateProps) => {
   const [debateTimer, setDebateTimer] = useState(0);
   const [isDebating, setIsDebating] = useState(false);
-  const [userScores, setUserScores] = useState<Record<string, DebaterScore>>({
-    [debateRequest.sender_id]: {
-      argumentStrength: 0,
-      clarity: 0,
-      engagement: 0,
-      overallScore: 0,
-      fillerWords: 0,
-      speakingTime: 0
-    },
-    [debateRequest.receiver_id]: {
-      argumentStrength: 0,
-      clarity: 0,
-      engagement: 0,
-      overallScore: 0,
-      fillerWords: 0,
-      speakingTime: 0
-    }
-  });
+  const [debateRequest, setDebateRequest] = useState<DebateRequestWithProfiles | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [userScores, setUserScores] = useState<Record<string, DebaterScore>>({});
   const [activeDebater, setActiveDebater] = useState<string | null>(null);
   const { user } = useAuth();
   const { toast } = useToast();
-  const roomRef = useRef<string>(`debate-${debateRequest.id}`);
+
+  useEffect(() => {
+    fetchDebateRequest();
+  }, [debateId]);
+
+  useEffect(() => {
+    if (debateRequest && user) {
+      initializeScores();
+      startDebate();
+    }
+  }, [debateRequest, user]);
 
   useEffect(() => {
     if (isDebating) {
       const interval = setInterval(() => {
         setDebateTimer(prev => prev + 1);
-        // Simulate real-time score updates
         updateScores();
       }, 1000);
       return () => clearInterval(interval);
     }
   }, [isDebating]);
 
-  useEffect(() => {
-    // Auto-start debate when component mounts
-    startDebate();
-    
-    // Listen for real-time updates from other user
-    const channel = supabase
-      .channel(`debate-room-${debateRequest.id}`)
-      .on('broadcast', { event: 'score_update' }, (payload) => {
-        if (payload.payload.userId !== user?.id) {
-          setUserScores(prev => ({
-            ...prev,
-            [payload.payload.userId]: payload.payload.scores
-          }));
-        }
-      })
-      .on('broadcast', { event: 'active_speaker' }, (payload) => {
-        setActiveDebater(payload.payload.userId);
-      })
-      .subscribe();
+  const fetchDebateRequest = async () => {
+    try {
+      const { data: requestData, error } = await supabase
+        .from('debate_requests')
+        .select('*')
+        .eq('id', debateId)
+        .single();
 
-    return () => {
-      channel.unsubscribe();
-    };
-  }, []);
+      if (error) throw error;
+
+      // Fetch profiles for both users
+      const userIds = [requestData.sender_id, requestData.receiver_id];
+      const { data: profilesData } = await supabase
+        .from('profiles')
+        .select('id, username, display_name')
+        .in('id', userIds);
+
+      const senderProfile = profilesData?.find(p => p.id === requestData.sender_id);
+      const receiverProfile = profilesData?.find(p => p.id === requestData.receiver_id);
+
+      setDebateRequest({
+        ...requestData,
+        sender_profile: senderProfile ? {
+          username: senderProfile.username || '',
+          display_name: senderProfile.display_name || ''
+        } : undefined,
+        receiver_profile: receiverProfile ? {
+          username: receiverProfile.username || '',
+          display_name: receiverProfile.display_name || ''
+        } : undefined
+      });
+    } catch (error) {
+      console.error('Error fetching debate request:', error);
+      toast({
+        title: "Error",
+        description: "Failed to load debate information.",
+        variant: "destructive"
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const initializeScores = () => {
+    if (!debateRequest) return;
+    
+    setUserScores({
+      [debateRequest.sender_id]: {
+        argumentStrength: 0,
+        clarity: 0,
+        engagement: 0,
+        overallScore: 0,
+        fillerWords: 0,
+        speakingTime: 0
+      },
+      [debateRequest.receiver_id]: {
+        argumentStrength: 0,
+        clarity: 0,
+        engagement: 0,
+        overallScore: 0,
+        fillerWords: 0,
+        speakingTime: 0
+      }
+    });
+  };
 
   const updateScores = () => {
-    if (!user) return;
+    if (!user || !debateRequest) return;
 
     const newScores: DebaterScore = {
       argumentStrength: Math.min(100, userScores[user.id]?.argumentStrength + Math.random() * 3),
@@ -119,7 +155,7 @@ export const UserVsUserDebate = ({ debateRequest, onEndDebate }: UserVsUserDebat
     }));
 
     // Broadcast scores to other user
-    supabase.channel(`debate-room-${debateRequest.id}`)
+    supabase.channel(`debate-room-${debateId}`)
       .send({
         type: 'broadcast',
         event: 'score_update',
@@ -131,35 +167,37 @@ export const UserVsUserDebate = ({ debateRequest, onEndDebate }: UserVsUserDebat
     setIsDebating(true);
     toast({
       title: "Debate Started! 🎯",
-      description: `You're now debating "${debateRequest.topic}" with ${getOpponentName()}`,
+      description: `You're now debating "${debateRequest?.topic}" with ${getOpponentName()}`,
     });
 
     // Create active debate record
-    supabase
-      .from('active_debates')
-      .insert({
-        participant_1_id: debateRequest.sender_id,
-        participant_2_id: debateRequest.receiver_id,
-        topic: debateRequest.topic,
-        status: 'active'
-      });
+    if (debateRequest) {
+      supabase
+        .from('active_debates')
+        .insert({
+          participant_1_id: debateRequest.sender_id,
+          participant_2_id: debateRequest.receiver_id,
+          topic: debateRequest.topic,
+          status: 'active'
+        });
+    }
   };
 
   const endDebate = async () => {
+    if (!debateRequest || !user) return;
+    
     setIsDebating(false);
     
-    // Determine winner based on scores
-    const myScore = userScores[user?.id || '']?.overallScore || 0;
-    const opponentId = user?.id === debateRequest.sender_id ? debateRequest.receiver_id : debateRequest.sender_id;
+    const myScore = userScores[user.id]?.overallScore || 0;
+    const opponentId = user.id === debateRequest.sender_id ? debateRequest.receiver_id : debateRequest.sender_id;
     const opponentScore = userScores[opponentId]?.overallScore || 0;
     
-    const winnerId = myScore > opponentScore ? user?.id : opponentId;
+    const winnerId = myScore > opponentScore ? user.id : opponentId;
     
-    // Update active debate with results - fix JSON serialization
     const debateDataJson = JSON.stringify({
       scores: userScores,
       duration: debateTimer,
-      final_scores: { [user?.id || '']: myScore, [opponentId]: opponentScore }
+      final_scores: { [user.id]: myScore, [opponentId]: opponentScore }
     });
 
     await supabase
@@ -189,15 +227,41 @@ export const UserVsUserDebate = ({ debateRequest, onEndDebate }: UserVsUserDebat
   };
 
   const getOpponentName = () => {
-    if (user?.id === debateRequest.sender_id) {
+    if (!debateRequest || !user) return 'Opponent';
+    
+    if (user.id === debateRequest.sender_id) {
       return debateRequest.receiver_profile?.display_name || debateRequest.receiver_profile?.username || 'Opponent';
     }
     return debateRequest.sender_profile?.display_name || debateRequest.sender_profile?.username || 'Opponent';
   };
 
   const getOpponentId = () => {
-    return user?.id === debateRequest.sender_id ? debateRequest.receiver_id : debateRequest.sender_id;
+    if (!debateRequest || !user) return '';
+    return user.id === debateRequest.sender_id ? debateRequest.receiver_id : debateRequest.sender_id;
   };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="flex flex-col items-center space-y-4">
+          <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin"></div>
+          <p className="text-muted-foreground">Loading debate...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!debateRequest) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="text-center">
+          <h2 className="text-2xl font-bold mb-2">Debate Not Found</h2>
+          <p className="text-muted-foreground mb-4">The debate session could not be loaded.</p>
+          <Button onClick={onEndDebate}>Return Home</Button>
+        </div>
+      </div>
+    );
+  }
 
   const myScore = userScores[user?.id || ''] || userScores[Object.keys(userScores)[0]];
   const opponentScore = userScores[getOpponentId()] || userScores[Object.keys(userScores)[1]];
