@@ -7,6 +7,7 @@ import { useDebateRequests } from '@/hooks/useDebateRequests';
 import { useAuth } from '@/contexts/AuthContext';
 import { formatDistanceToNow } from 'date-fns';
 import { supabase } from '@/integrations/supabase/client';
+
 export const DebateRequests = () => {
   const {
     requests,
@@ -21,6 +22,7 @@ export const DebateRequests = () => {
   // Listen for accepted requests to auto-redirect both users
   useEffect(() => {
     if (!user) return;
+    
     const channel = supabase.channel(`debate-redirect-${user.id}`).on('postgres_changes', {
       event: 'UPDATE',
       schema: 'public',
@@ -31,16 +33,22 @@ export const DebateRequests = () => {
       // Redirect if this user is involved in the accepted debate
       if (request.sender_id === user.id || request.receiver_id === user.id) {
         console.log('Debate accepted, redirecting to debate page:', request.id);
-        navigate(`/debate/${request.id}`);
+        // Small delay to ensure both users get the update
+        setTimeout(() => {
+          navigate(`/debate/${request.id}`);
+        }, 500);
       }
     }).subscribe();
+    
     return () => {
       supabase.removeChannel(channel);
     };
   }, [user, navigate]);
+
   const pendingRequests = requests.filter(req => req.status === 'pending');
   const sentRequests = pendingRequests.filter(req => req.sender_id === user?.id);
   const receivedRequests = pendingRequests.filter(req => req.receiver_id === user?.id);
+  
   const handleAcceptRequest = async (request: any) => {
     const success = await respondToRequest(request.id, 'accepted');
     if (success) {
