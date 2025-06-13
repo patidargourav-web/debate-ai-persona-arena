@@ -6,6 +6,8 @@ import { Progress } from '@/components/ui/progress';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { useWebRTC } from '@/hooks/useWebRTC';
+import { Mic, MicOff, Video, VideoOff } from 'lucide-react';
 
 interface UserVsUserDebateProps {
   debateId: string;
@@ -43,12 +45,34 @@ export const UserVsUserDebate = ({ debateId, onEndDebate }: UserVsUserDebateProp
   const [loading, setLoading] = useState(true);
   const [userScores, setUserScores] = useState<Record<string, DebaterScore>>({});
   const [activeDebater, setActiveDebater] = useState<string | null>(null);
-  const [isConnected, setIsConnected] = useState(false);
-  const [opponentConnected, setOpponentConnected] = useState(false);
   const [participantCount, setParticipantCount] = useState(0);
   const { user } = useAuth();
   const { toast } = useToast();
   const channelRef = useRef<any>(null);
+  const localVideoRef = useRef<HTMLVideoElement>(null);
+  const remoteVideoRef = useRef<HTMLVideoElement>(null);
+
+  // Determine if this user is the initiator (sender of the request)
+  const isInitiator = debateRequest?.sender_id === user?.id;
+
+  // Initialize WebRTC
+  const {
+    connectionState,
+    localStream,
+    remoteStream,
+    isAudioEnabled,
+    isVideoEnabled,
+    isConnecting,
+    initializeWebRTC,
+    toggleMicrophone,
+    toggleCamera,
+    setLocalVideoElement,
+    setRemoteVideoElement
+  } = useWebRTC({
+    debateId,
+    userId: user?.id || '',
+    isInitiator
+  });
 
   useEffect(() => {
     fetchDebateRequest();
@@ -61,6 +85,26 @@ export const UserVsUserDebate = ({ debateId, onEndDebate }: UserVsUserDebateProp
       startDebate();
     }
   }, [debateRequest, user]);
+
+  // Initialize WebRTC when debate starts
+  useEffect(() => {
+    if (debateRequest && user && !isConnecting) {
+      initializeWebRTC();
+    }
+  }, [debateRequest, user, initializeWebRTC, isConnecting]);
+
+  // Set video elements when refs are available
+  useEffect(() => {
+    if (localVideoRef.current) {
+      setLocalVideoElement(localVideoRef.current);
+    }
+  }, [localVideoRef.current, setLocalVideoElement]);
+
+  useEffect(() => {
+    if (remoteVideoRef.current) {
+      setRemoteVideoElement(remoteVideoRef.current);
+    }
+  }, [remoteVideoRef.current, setRemoteVideoElement]);
 
   useEffect(() => {
     if (isDebating) {
@@ -87,27 +131,20 @@ export const UserVsUserDebate = ({ debateId, onEndDebate }: UserVsUserDebateProp
     }
 
     const channel = supabase
-      .channel(`debate-room-${debateId}`)
+      .channel(`debate-presence-${debateId}`)
       .on('presence', { event: 'sync' }, () => {
         const newState = channel.presenceState();
         console.log('Users in debate room:', newState);
         
         const participantCount = Object.keys(newState).length;
         setParticipantCount(participantCount);
-        
-        // Check if opponent is connected
-        const opponentId = user.id === debateRequest.sender_id ? debateRequest.receiver_id : debateRequest.sender_id;
-        const opponentPresent = Object.keys(newState).some(key => 
-          newState[key].some((presence: any) => presence.user_id === opponentId)
-        );
-        setOpponentConnected(opponentPresent);
       })
       .on('presence', { event: 'join' }, ({ key, newPresences }) => {
         console.log('User joined:', key, newPresences);
         if (newPresences.length > 0 && newPresences[0].user_id !== user.id) {
           toast({
             title: "🎯 Opponent Joined!",
-            description: "Your opponent has entered the debate room. Let the debate begin!",
+            description: "Your opponent has entered the debate room. Video connecting...",
           });
         }
       })
@@ -129,20 +166,13 @@ export const UserVsUserDebate = ({ debateId, onEndDebate }: UserVsUserDebateProp
             [userId]: scores
           }));
         }
-      })
-      .on('broadcast', { event: 'speaking_status' }, (payload) => {
-        const { userId, isSpeaking } = payload.payload;
-        if (isSpeaking) {
-          setActiveDebater(userId);
-        }
       });
 
     channelRef.current = channel;
     
     channel.subscribe(async (status) => {
       if (status === 'SUBSCRIBED') {
-        setIsConnected(true);
-        // Track user presence with enhanced data
+        // Track user presence
         await channel.track({
           user_id: user.id,
           username: user.email,
@@ -150,11 +180,6 @@ export const UserVsUserDebate = ({ debateId, onEndDebate }: UserVsUserDebateProp
           online_at: new Date().toISOString(),
           debate_id: debateId,
           status: 'active'
-        });
-        
-        toast({
-          title: "🔗 Connected to Debate Room",
-          description: "Waiting for your opponent to join...",
         });
       }
     });
@@ -339,6 +364,38 @@ export const UserVsUserDebate = ({ debateId, onEndDebate }: UserVsUserDebateProp
     return user.id === debateRequest.sender_id ? debateRequest.receiver_id : debateRequest.sender_id;
   };
 
+  const getConnectionStatusText = () => {
+    switch (connectionState) {
+      case 'connecting':
+        return 'Connecting to video...';
+      case 'connected':
+        return 'Video connected';
+      case 'disconnected':
+        return 'Video disconnected';
+      case 'failed':
+        return 'Connection failed';
+      case 'new':
+        return 'Initializing...';
+      default:
+        return 'Unknown status';
+    }  
+  };
+
+  const getConnectionStatusColor = () => {
+    switch (connectionState) {
+      case 'connected':
+        return 'text-green-400';
+      case 'connecting':
+      case 'new':
+        return 'text-yellow-400';
+      case 'disconnected':
+      case 'failed':
+        return 'text-red-400';
+      default:
+        return 'text-gray-400';
+    }
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 flex items-center justify-center">
@@ -376,27 +433,23 @@ export const UserVsUserDebate = ({ debateId, onEndDebate }: UserVsUserDebateProp
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900">
-      {/* Tavus AI-Style Header */}
+      {/* Enhanced Header with WebRTC Status */}
       <div className="p-6 bg-black/30 backdrop-blur-lg border-b border-purple-500/20">
         <div className="flex justify-between items-center">
           <div className="text-white">
             <div className="flex items-center gap-3 mb-2">
               <div className="w-3 h-3 bg-red-500 rounded-full animate-pulse"></div>
               <h2 className="text-2xl font-bold bg-gradient-to-r from-purple-400 to-blue-400 bg-clip-text text-transparent">
-                🎯 Live Debate Arena
+                🎯 Live Video Debate Arena
               </h2>
             </div>
             <p className="text-slate-300 text-lg font-medium">
               {debateRequest.topic}
             </p>
             <div className="flex items-center gap-6 text-sm mt-2">
-              <div className={`flex items-center gap-2 ${isConnected ? 'text-green-400' : 'text-red-400'}`}>
-                <div className={`w-2 h-2 rounded-full ${isConnected ? 'bg-green-400 animate-pulse' : 'bg-red-400'}`}></div>
-                {isConnected ? 'Connected' : 'Connecting...'}
-              </div>
-              <div className={`flex items-center gap-2 ${opponentConnected ? 'text-green-400' : 'text-yellow-400'}`}>
-                <div className={`w-2 h-2 rounded-full ${opponentConnected ? 'bg-green-400 animate-pulse' : 'bg-yellow-400'}`}></div>
-                {opponentConnected ? `${getOpponentName()} Online` : 'Waiting for opponent...'}
+              <div className={`flex items-center gap-2 ${getConnectionStatusColor()}`}>
+                <div className={`w-2 h-2 rounded-full ${connectionState === 'connected' ? 'bg-green-400 animate-pulse' : connectionState === 'connecting' ? 'bg-yellow-400 animate-pulse' : 'bg-red-400'}`}></div>
+                {getConnectionStatusText()}
               </div>
               <div className="text-purple-400">
                 👥 {participantCount}/2 participants
@@ -416,10 +469,10 @@ export const UserVsUserDebate = ({ debateId, onEndDebate }: UserVsUserDebateProp
       </div>
 
       <div className="flex flex-col xl:flex-row h-[calc(100vh-120px)]">
-        {/* Tavus AI-Style Video Conference Area */}
+        {/* Real-time Video Conference Area */}
         <div className="flex-1 p-6">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 h-full">
-            {/* User's Video - Tavus AI Style */}
+            {/* User's Real Video Feed */}
             <Card className="bg-gradient-to-br from-blue-900/50 to-purple-900/50 backdrop-blur-lg border-blue-500/30 p-6 relative overflow-hidden">
               <div className="absolute inset-0 bg-gradient-to-br from-blue-600/10 to-purple-600/10"></div>
               <div className="relative z-10">
@@ -432,19 +485,45 @@ export const UserVsUserDebate = ({ debateId, onEndDebate }: UserVsUserDebateProp
                     <Badge className={`${activeDebater === user?.id ? 'bg-green-500 animate-pulse' : 'bg-gray-600'} text-white`}>
                       {activeDebater === user?.id ? '🎤 Speaking' : '👂 Listening'}
                     </Badge>
-                    <div className={`w-3 h-3 rounded-full ${isConnected ? 'bg-green-400 animate-pulse' : 'bg-red-400'}`}></div>
+                    <Button
+                      size="sm"
+                      variant={isAudioEnabled ? "default" : "destructive"}
+                      onClick={toggleMicrophone}
+                      className="w-8 h-8 p-0"
+                    >
+                      {isAudioEnabled ? <Mic className="w-4 h-4" /> : <MicOff className="w-4 h-4" />}
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant={isVideoEnabled ? "default" : "destructive"}
+                      onClick={toggleCamera}
+                      className="w-8 h-8 p-0"
+                    >
+                      {isVideoEnabled ? <Video className="w-4 h-4" /> : <VideoOff className="w-4 h-4" />}
+                    </Button>
                   </div>
                 </div>
                 
-                <div className="aspect-video bg-gradient-to-br from-blue-600/20 to-purple-600/20 rounded-xl flex items-center justify-center relative border border-blue-500/30">
-                  <div className="absolute inset-0 bg-gradient-to-br from-blue-500/5 to-purple-500/5 rounded-xl"></div>
-                  <div className="text-center relative z-10">
-                    <div className="w-32 h-32 bg-gradient-to-br from-blue-500 to-purple-500 rounded-full flex items-center justify-center text-4xl mb-4 mx-auto shadow-2xl">
-                      👤
+                <div className="aspect-video bg-black rounded-xl flex items-center justify-center relative border border-blue-500/30 overflow-hidden">
+                  <video
+                    ref={localVideoRef}
+                    autoPlay
+                    muted
+                    playsInline
+                    className="w-full h-full object-cover rounded-xl"
+                  />
+                  
+                  {!localStream && (
+                    <div className="absolute inset-0 bg-gradient-to-br from-blue-600/20 to-purple-600/20 rounded-xl flex items-center justify-center">
+                      <div className="text-center">
+                        <div className="w-32 h-32 bg-gradient-to-br from-blue-500 to-purple-500 rounded-full flex items-center justify-center text-4xl mb-4 mx-auto shadow-2xl">
+                          👤
+                        </div>
+                        <p className="text-white font-semibold text-lg">Connecting Camera...</p>
+                        <p className="text-blue-200 text-sm">Please allow camera access</p>
+                      </div>
                     </div>
-                    <p className="text-white font-semibold text-lg">Your Camera</p>
-                    <p className="text-blue-200 text-sm">AI-Powered Analysis Active</p>
-                  </div>
+                  )}
                   
                   {activeDebater === user?.id && (
                     <div className="absolute top-4 right-4 bg-red-500 text-white px-3 py-2 rounded-lg text-sm font-bold animate-pulse shadow-lg">
@@ -452,11 +531,14 @@ export const UserVsUserDebate = ({ debateId, onEndDebate }: UserVsUserDebateProp
                     </div>
                   )}
                   
-                  {/* AI Analysis Overlay */}
-                  <div className="absolute bottom-4 left-4 right-4 bg-black/60 backdrop-blur-sm rounded-lg p-3">
+                  {/* Enhanced AI Analysis Overlay */}
+                  <div className="absolute bottom-4 left-4 right-4 bg-black/80 backdrop-blur-lg rounded-lg p-3 border border-blue-500/30">
                     <div className="flex justify-between text-xs text-white">
-                      <span>Confidence: {Math.round(myScore?.overallScore || 0)}%</span>
+                      <span>Performance: {Math.round(myScore?.overallScore || 0)}%</span>
                       <span>Clarity: {Math.round(myScore?.clarity || 0)}%</span>
+                      <span className={`${connectionState === 'connected' ? 'text-green-400' : 'text-yellow-400'}`}>
+                        📡 {connectionState === 'connected' ? 'HD' : 'Connecting'}
+                      </span>
                     </div>
                   </div>
                 </div>
@@ -475,36 +557,42 @@ export const UserVsUserDebate = ({ debateId, onEndDebate }: UserVsUserDebateProp
               </div>
             </Card>
 
-            {/* Opponent's Video - Tavus AI Style */}
+            {/* Opponent's Real Video Feed */}
             <Card className="bg-gradient-to-br from-purple-900/50 to-pink-900/50 backdrop-blur-lg border-purple-500/30 p-6 relative overflow-hidden">
               <div className="absolute inset-0 bg-gradient-to-br from-purple-600/10 to-pink-600/10"></div>
               <div className="relative z-10">
                 <div className="flex items-center justify-between mb-4">
                   <div className="flex items-center gap-3">
-                    <div className={`w-3 h-3 rounded-full ${opponentConnected ? 'bg-purple-500 animate-pulse' : 'bg-yellow-500'}`}></div>
+                    <div className={`w-3 h-3 rounded-full ${remoteStream ? 'bg-purple-500 animate-pulse' : 'bg-yellow-500'}`}></div>
                     <h3 className="text-white font-bold text-lg">{getOpponentName()}</h3>
                   </div>
                   <div className="flex items-center gap-3">
                     <Badge className={`${activeDebater === getOpponentId() ? 'bg-green-500 animate-pulse' : 'bg-gray-600'} text-white`}>
                       {activeDebater === getOpponentId() ? '🎤 Speaking' : '👂 Listening'}
                     </Badge>
-                    <div className={`w-3 h-3 rounded-full ${opponentConnected ? 'bg-green-400 animate-pulse' : 'bg-yellow-400'}`}></div>
+                    <div className={`w-3 h-3 rounded-full ${remoteStream ? 'bg-green-400 animate-pulse' : 'bg-yellow-400'}`}></div>
                   </div>
                 </div>
                 
-                <div className="aspect-video bg-gradient-to-br from-purple-600/20 to-pink-600/20 rounded-xl flex items-center justify-center relative border border-purple-500/30">
-                  <div className="absolute inset-0 bg-gradient-to-br from-purple-500/5 to-pink-500/5 rounded-xl"></div>
-                  <div className="text-center relative z-10">
-                    <div className="w-32 h-32 bg-gradient-to-br from-purple-500 to-pink-500 rounded-full flex items-center justify-center text-4xl mb-4 mx-auto shadow-2xl">
-                      👤
+                <div className="aspect-video bg-black rounded-xl flex items-center justify-center relative border border-purple-500/30 overflow-hidden">
+                  <video
+                    ref={remoteVideoRef}
+                    autoPlay
+                    playsInline
+                    className="w-full h-full object-cover rounded-xl"
+                  />
+                  
+                  {!remoteStream && (
+                    <div className="absolute inset-0 bg-gradient-to-br from-purple-600/20 to-pink-600/20 rounded-xl flex items-center justify-center">
+                      <div className="text-center">
+                        <div className="w-32 h-32 bg-gradient-to-br from-purple-500 to-pink-500 rounded-full flex items-center justify-center text-4xl mb-4 mx-auto shadow-2xl">
+                          👤
+                        </div>
+                        <p className="text-white font-semibold text-lg">{getOpponentName()}</p>
+                        <p className="text-yellow-400 text-sm animate-pulse">⏳ Waiting for video...</p>
+                      </div>
                     </div>
-                    <p className="text-white font-semibold text-lg">{getOpponentName()}</p>
-                    {!opponentConnected ? (
-                      <p className="text-yellow-400 text-sm animate-pulse">⏳ Connecting...</p>
-                    ) : (
-                      <p className="text-purple-200 text-sm">Connected & Ready</p>
-                    )}
-                  </div>
+                  )}
                   
                   {activeDebater === getOpponentId() && (
                     <div className="absolute top-4 right-4 bg-red-500 text-white px-3 py-2 rounded-lg text-sm font-bold animate-pulse shadow-lg">
@@ -513,10 +601,13 @@ export const UserVsUserDebate = ({ debateId, onEndDebate }: UserVsUserDebateProp
                   )}
                   
                   {/* AI Analysis Overlay */}
-                  <div className="absolute bottom-4 left-4 right-4 bg-black/60 backdrop-blur-sm rounded-lg p-3">
+                  <div className="absolute bottom-4 left-4 right-4 bg-black/80 backdrop-blur-lg rounded-lg p-3 border border-purple-500/30">
                     <div className="flex justify-between text-xs text-white">
-                      <span>Confidence: {Math.round(opponentScore?.overallScore || 0)}%</span>
+                      <span>Performance: {Math.round(opponentScore?.overallScore || 0)}%</span>
                       <span>Clarity: {Math.round(opponentScore?.clarity || 0)}%</span>
+                      <span className={`${remoteStream ? 'text-green-400' : 'text-yellow-400'}`}>
+                        📡 {remoteStream ? 'HD' : 'Connecting'}
+                      </span>
                     </div>
                   </div>
                 </div>
@@ -546,24 +637,31 @@ export const UserVsUserDebate = ({ debateId, onEndDebate }: UserVsUserDebateProp
             </Badge>
           </h3>
 
-          {/* Connection Status */}
+          {/* WebRTC Connection Status */}
           <Card className="bg-slate-800/50 border-slate-600/50 p-4 mb-6 backdrop-blur-sm">
             <h4 className="text-white font-semibold mb-3 flex items-center gap-2">
-              🔗 Connection Status
+              🔗 Video Connection Status
             </h4>
             <div className="space-y-2 text-sm">
               <div className="flex justify-between items-center">
-                <span className="text-slate-300">You</span>
-                <span className={`flex items-center gap-2 ${isConnected ? 'text-green-400' : 'text-red-400'}`}>
-                  <div className={`w-2 h-2 rounded-full ${isConnected ? 'bg-green-400 animate-pulse' : 'bg-red-400'}`}></div>
-                  {isConnected ? 'Connected' : 'Disconnected'}
+                <span className="text-slate-300">Your Camera</span>
+                <span className={`flex items-center gap-2 ${localStream ? 'text-green-400' : 'text-red-400'}`}>
+                  <div className={`w-2 h-2 rounded-full ${localStream ? 'bg-green-400 animate-pulse' : 'bg-red-400'}`}></div>
+                  {localStream ? 'Active' : 'Disconnected'}
                 </span>
               </div>
               <div className="flex justify-between items-center">
-                <span className="text-slate-300">{getOpponentName()}</span>
-                <span className={`flex items-center gap-2 ${opponentConnected ? 'text-green-400' : 'text-yellow-400'}`}>
-                  <div className={`w-2 h-2 rounded-full ${opponentConnected ? 'bg-green-400 animate-pulse' : 'bg-yellow-400'}`}></div>
-                  {opponentConnected ? 'Connected' : 'Waiting...'}
+                <span className="text-slate-300">{getOpponentName()}'s Camera</span>
+                <span className={`flex items-center gap-2 ${remoteStream ? 'text-green-400' : 'text-yellow-400'}`}>
+                  <div className={`w-2 h-2 rounded-full ${remoteStream ? 'bg-green-400 animate-pulse' : 'bg-yellow-400'}`}></div>
+                  {remoteStream ? 'Connected' : 'Waiting...'}
+                </span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-slate-300">WebRTC Status</span>
+                <span className={`flex items-center gap-2 ${getConnectionStatusColor()}`}>
+                  <div className={`w-2 h-2 rounded-full ${connectionState === 'connected' ? 'bg-green-400 animate-pulse' : connectionState === 'connecting' ? 'bg-yellow-400 animate-pulse' : 'bg-red-400'}`}></div>
+                  {connectionState.charAt(0).toUpperCase() + connectionState.slice(1)}
                 </span>
               </div>
             </div>
