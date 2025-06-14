@@ -179,13 +179,9 @@ export const UserVsUserDebate = ({ debateId, onEndDebate }: UserVsUserDebateProp
         if (leftPresences.length > 0 && leftPresences[0].user_id !== user.id) {
           toast({
             title: "⚠️ Opponent Left",
-            description: "Your opponent has left the debate room. Exiting in 3s...",
+            description: "Your opponent has left the debate room.",
             variant: "destructive"
           });
-          // Automatically leave the debate if opponent leaves
-          setTimeout(() => {
-            onEndDebate();
-          }, 3000);
         }
       })
       .on('broadcast', { event: 'score_update' }, (payload) => {
