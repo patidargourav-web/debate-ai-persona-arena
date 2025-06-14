@@ -200,25 +200,56 @@ export const UserVsUserDebate = ({ debateId, onEndDebate }: UserVsUserDebateProp
     });
   };
 
+  // Add: DEBUG log for state at top render
+  if (typeof window !== "undefined") {
+    console.log("[DEBUG] UserVsUserDebate render", { loading, debateRequest, debateId });
+  }
+
+  // PATCH: Ensure fetchDebateRequest is called and errors propagate
   const fetchDebateRequest = async () => {
     try {
+      console.log("[DEBUG] fetchDebateRequest: start", { debateId });
       const { data: requestData, error } = await supabase
         .from('debate_requests')
         .select('*')
         .eq('id', debateId)
         .single();
 
-      if (error) throw error;
+      if (error) {
+        console.error('[DEBUG] fetchDebateRequest: error', error);
+        throw error;
+      }
 
-      // Fetch profiles for both users
+      if (!requestData) {
+        console.warn('[DEBUG] fetchDebateRequest: requestData is null');
+        toast({
+          title: "Debate Not Found",
+          description: "Could not find debate request in the database.",
+          variant: "destructive"
+        });
+        setDebateRequest(null);
+        setLoading(false);
+        return;
+      }
+
       const userIds = [requestData.sender_id, requestData.receiver_id];
-      const { data: profilesData } = await supabase
+      const { data: profilesData, error: profileError } = await supabase
         .from('profiles')
         .select('id, username, display_name')
         .in('id', userIds);
 
+      if (profileError) {
+        console.error('[DEBUG] fetchDebateRequest: profileError', profileError);
+        throw profileError;
+      }
+
       const senderProfile = profilesData?.find(p => p.id === requestData.sender_id);
       const receiverProfile = profilesData?.find(p => p.id === requestData.receiver_id);
+
+      // Add debug
+      console.log('[DEBUG] fetchDebateRequest: requestData', requestData);
+      console.log('[DEBUG] fetchDebateRequest: senderProfile', senderProfile);
+      console.log('[DEBUG] fetchDebateRequest: receiverProfile', receiverProfile);
 
       setDebateRequest({
         ...requestData,
@@ -235,13 +266,21 @@ export const UserVsUserDebate = ({ debateId, onEndDebate }: UserVsUserDebateProp
       console.error('Error fetching debate request:', error);
       toast({
         title: "Error",
-        description: "Failed to load debate information.",
+        description: "Failed to load debate information. See console for details.",
         variant: "destructive"
       });
+      setDebateRequest(null);
     } finally {
       setLoading(false);
+      console.log('[DEBUG] fetchDebateRequest: setLoading(false)');
     }
   };
+
+  useEffect(() => {
+    fetchDebateRequest();
+    // Log when effect fires
+    console.log('[DEBUG] useEffect(fetchDebateRequest) fired', { debateId });
+  }, [debateId]);
 
   const initializeScores = () => {
     if (!debateRequest) return;
