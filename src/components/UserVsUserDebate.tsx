@@ -71,15 +71,9 @@ export const UserVsUserDebate = ({ debateId, onEndDebate }: UserVsUserDebateProp
   } = useWebRTC({
     debateId,
     userId: user?.id || '',
-    isInitiator
+    isInitiator: !!debateRequest && debateRequest.sender_id === user?.id
   });
 
-  // New: state to track if both refs are set
-  const [videoRefsReady, setVideoRefsReady] = useState(false);
-
-  // --- PATCH: DEBOUNCE/DELAY INITIALIZING WEBRTC FOR RECEIVER (important!) ---
-  // The sender (initiator) can initialize immediately.
-  // The receiver should wait for signaling subscription and opponent presence.
   useEffect(() => {
     if (debateRequest && user) {
       initializeScores();
@@ -88,96 +82,56 @@ export const UserVsUserDebate = ({ debateId, onEndDebate }: UserVsUserDebateProp
     }
   }, [debateRequest, user]);
 
-  useEffect(() => {
-    // Only start once real-time channel exists and at least one other participant is detected
-    if (debateRequest && user && !isConnecting) {
-      if (isInitiator) {
-        // Sender starts immediately
-        console.log('[WebRTC] I am initiator, starting immediately...');
-        initializeWebRTC();
-      } else {
-        // Receiver: wait to ensure signaling and presence is ready before initializing
-        if (participantCount >= 2) {
-          console.log('[WebRTC] I am receiver. Both present! Initializing WebRTC after small delay...');
-          setTimeout(() => {
-            initializeWebRTC();
-          }, 600); // Increased delay for more reliability
-        } else {
-          // Not enough participants in the room yet, log and wait for future effect runs
-          console.log('[WebRTC] Receiver waiting for both participants to arrive before initializing...');
-        }
-      }
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [debateRequest, user, isConnecting, isInitiator, participantCount]);
-  // ^ Include participantCount to allow re-run when another user joins
-
-  // Detect when both refs are mounted and set videoRefsReady
-  useEffect(() => {
-    if (localVideoRef.current && remoteVideoRef.current) {
-      setVideoRefsReady(true);
-      // Set the elements to WebRTC context
-      setLocalVideoElement(localVideoRef.current);
-      setRemoteVideoElement(remoteVideoRef.current);
-      console.log("[VIDEO] Both local and remote refs are mounted, videoRefsReady set to true");
-    } else {
-      setVideoRefsReady(false);
-    }
-  }, [
-    localVideoRef.current,
-    remoteVideoRef.current,
-    setLocalVideoElement,
-    setRemoteVideoElement,
-  ]);
-
-  // --- WebRTC initialization logic ---
+  // Single, reliable useEffect for WebRTC initialization
   useEffect(() => {
     // We can only initialize when all are true:
-    // - User present
-    // - Debate request loaded (so we know initiator)
-    // - participantCount === 2 (both present)
-    // - videoRefsReady (DOM elements mounted)
-    // - Not already connecting
-    if (
+    // 1. We have the debate request data (to know who is initiator)
+    // 2. We have the user object
+    // 3. We are not already trying to connect
+    // 4. Both participants are in the presence channel
+    // 5. Both <video> elements are mounted in the DOM
+    const canInitialize =
       debateRequest &&
       user &&
-      videoRefsReady &&
       !isConnecting &&
-      participantCount === 2
-    ) {
-      // Initiator and receiver both use same logic for max reliability
-      console.log(`[WebRTC] Both videoRefsReady and participantCount==2. Initializing WebRTC. isInitiator: ${isInitiator}`);
+      participantCount === 2 &&
+      localVideoRef.current &&
+      remoteVideoRef.current;
+
+    if (canInitialize) {
+      console.log(`[WebRTC] All conditions met. Initializing... isInitiator: ${isInitiator}`);
+      
+      // It's crucial to set the video elements in the WebRTC service *before* initializing.
+      setLocalVideoElement(localVideoRef.current);
+      setRemoteVideoElement(remoteVideoRef.current);
+      
       initializeWebRTC();
     } else {
-      // Log reasons for not (yet) initializing
-      if (!debateRequest) console.log("[WebRTC] Not initializing: debateRequest missing");
-      if (!user) console.log("[WebRTC] Not initializing: user missing");
-      if (!videoRefsReady) console.log("[WebRTC] Not initializing: videoRefsReady is false");
-      if (isConnecting) console.log("[WebRTC] Not initializing: isConnecting is true");
-      if (participantCount < 2) console.log(`[WebRTC] Not initializing: participantCount=${participantCount}`);
+      // Log reasons for not (yet) initializing for easier debugging
+      if (typeof window !== "undefined") {
+        console.log("[WebRTC] Not initializing yet. Waiting for conditions:", {
+          hasDebateRequest: !!debateRequest,
+          hasUser: !!user,
+          isConnecting,
+          participantCount,
+          hasLocalVideoRef: !!localVideoRef.current,
+          hasRemoteVideoRef: !!remoteVideoRef.current,
+        });
+      }
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // This effect will re-evaluate when any of these dependency values change.
+    // The component re-renders when refs are mounted (via other state changes), 
+    // and this effect will run again and find the refs.
   }, [
     debateRequest,
     user,
     isConnecting,
     participantCount,
-    videoRefsReady,
-    isInitiator, // for debug
+    isInitiator,
+    initializeWebRTC,
+    setLocalVideoElement,
+    setRemoteVideoElement,
   ]);
-
-  // Set video elements when refs are available
-  useEffect(() => {
-    if (localVideoRef.current) {
-      setLocalVideoElement(localVideoRef.current);
-    }
-  }, [localVideoRef.current, setLocalVideoElement]);
-
-  useEffect(() => {
-    if (remoteVideoRef.current) {
-      setRemoteVideoElement(remoteVideoRef.current);
-    }
-  }, [remoteVideoRef.current, setRemoteVideoElement]);
 
   useEffect(() => {
     if (isDebating) {
