@@ -11,6 +11,7 @@ import { Navigation } from '@/components/Navigation';
 import { UserDebatesSection } from '@/components/UserDebatesSection';
 import { useAuth } from '@/contexts/AuthContext';
 import { DebateResultsData } from '@/hooks/useDebateResults';
+import Landing from './Landing';
 
 const Index = () => {
   const [currentView, setCurrentView] = useState<'home' | 'debate' | 'results' | 'leaderboard' | 'user-debates'>('home');
@@ -21,9 +22,7 @@ const Index = () => {
   const navigate = useNavigate();
 
   useEffect(() => {
-    if (!loading && !user) {
-      navigate('/auth');
-    }
+    // No redirect. Show Landing to unauthorized users instead.
   }, [user, loading, navigate]);
 
   if (loading) {
@@ -37,8 +36,9 @@ const Index = () => {
     );
   }
 
+  // 👇 Show the Landing page to unauthorized users
   if (!user) {
-    return null;
+    return <Landing />;
   }
 
   const startDebate = () => {
@@ -242,3 +242,4 @@ const Index = () => {
 };
 
 export default Index;
+
