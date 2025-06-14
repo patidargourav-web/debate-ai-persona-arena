@@ -1,9 +1,9 @@
-
 import React, { useEffect } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { LogIn, UserPlus } from "lucide-react";
+import SpotlightCursor from "@/components/SpotlightCursor";
 
 const features = [
   {
@@ -50,10 +50,14 @@ const Landing: React.FC = () => {
 
   return (
     <div className={`relative min-h-screen flex flex-col items-center justify-center overflow-hidden px-4 py-12 ${gradientBg}`}>
+      {/* Spotlight mouse-follow effect */}
+      <SpotlightCursor />
+
       {/* Animated/Decorative Background Shapes */}
       <div className={`${accentShape} w-[440px] h-[440px] bg-primary top-[-120px] left-[-120px] animate-float`}></div>
       <div className={`${accentShape} w-[320px] h-[280px] bg-gradient-to-br from-accent to-secondary right-[-100px] top-1/3 animate-float`} style={{ animationDelay: "1.2s" }}></div>
       <div className={`${accentShape} w-[200px] h-[140px] bg-muted bottom-10 left-1/2 animate-float`} style={{ animationDelay: "2.4s" }}></div>
+      
       {/* Main content */}
       <div className="relative z-10 flex flex-col items-center w-full">
         {/* Header */}
