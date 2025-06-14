@@ -74,10 +74,9 @@ export const UserVsUserDebate = ({ debateId, onEndDebate }: UserVsUserDebateProp
     isInitiator
   });
 
-  useEffect(() => {
-    fetchDebateRequest();
-  }, [debateId]);
-
+  // --- PATCH: DEBOUNCE/DELAY INITIALIZING WEBRTC FOR RECEIVER (important!) ---
+  // The sender (initiator) can initialize immediately.
+  // The receiver should wait for signaling subscription and opponent presence.
   useEffect(() => {
     if (debateRequest && user) {
       initializeScores();
@@ -86,12 +85,29 @@ export const UserVsUserDebate = ({ debateId, onEndDebate }: UserVsUserDebateProp
     }
   }, [debateRequest, user]);
 
-  // Initialize WebRTC when debate starts
   useEffect(() => {
+    // Only start once real-time channel exists and at least one other participant is detected
     if (debateRequest && user && !isConnecting) {
-      initializeWebRTC();
+      if (isInitiator) {
+        // Sender starts immediately
+        console.log('[WebRTC] I am initiator, starting immediately...');
+        initializeWebRTC();
+      } else {
+        // Receiver: wait to ensure signaling and presence is ready before initializing
+        if (participantCount >= 2) {
+          console.log('[WebRTC] I am receiver. Both present! Initializing WebRTC after small delay...');
+          setTimeout(() => {
+            initializeWebRTC();
+          }, 600); // Increased delay for more reliability
+        } else {
+          // Not enough participants in the room yet, log and wait for future effect runs
+          console.log('[WebRTC] Receiver waiting for both participants to arrive before initializing...');
+        }
+      }
     }
-  }, [debateRequest, user, initializeWebRTC, isConnecting]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [debateRequest, user, isConnecting, isInitiator, participantCount]);
+  // ^ Include participantCount to allow re-run when another user joins
 
   // Set video elements when refs are available
   useEffect(() => {
@@ -125,7 +141,6 @@ export const UserVsUserDebate = ({ debateId, onEndDebate }: UserVsUserDebateProp
   const setupRealTimeConnection = () => {
     if (!user || !debateRequest) return;
 
-    // Clean up existing channel
     if (channelRef.current) {
       supabase.removeChannel(channelRef.current);
     }
@@ -134,13 +149,13 @@ export const UserVsUserDebate = ({ debateId, onEndDebate }: UserVsUserDebateProp
       .channel(`debate-presence-${debateId}`)
       .on('presence', { event: 'sync' }, () => {
         const newState = channel.presenceState();
-        console.log('Users in debate room:', newState);
-        
-        const participantCount = Object.keys(newState).length;
-        setParticipantCount(participantCount);
+        console.log('[Presence] Current Users in Debate Room:', newState);
+
+        const count = Object.keys(newState).length;
+        setParticipantCount(count);
       })
       .on('presence', { event: 'join' }, ({ key, newPresences }) => {
-        console.log('User joined:', key, newPresences);
+        console.log('[Presence] User joined:', key, newPresences);
         if (newPresences.length > 0 && newPresences[0].user_id !== user.id) {
           toast({
             title: "🎯 Opponent Joined!",
@@ -149,7 +164,7 @@ export const UserVsUserDebate = ({ debateId, onEndDebate }: UserVsUserDebateProp
         }
       })
       .on('presence', { event: 'leave' }, ({ key, leftPresences }) => {
-        console.log('User left:', key, leftPresences);
+        console.log('[Presence] User left:', key, leftPresences);
         if (leftPresences.length > 0 && leftPresences[0].user_id !== user.id) {
           toast({
             title: "⚠️ Opponent Left",
@@ -169,7 +184,7 @@ export const UserVsUserDebate = ({ debateId, onEndDebate }: UserVsUserDebateProp
       });
 
     channelRef.current = channel;
-    
+
     channel.subscribe(async (status) => {
       if (status === 'SUBSCRIBED') {
         // Track user presence
@@ -616,7 +631,7 @@ export const UserVsUserDebate = ({ debateId, onEndDebate }: UserVsUserDebateProp
                 <div className="mt-4 space-y-3">
                   <div className="flex justify-between text-sm">
                     <span className="text-purple-200">Overall Performance</span>
-                    <span className="text-purple-400 font-bold text-lg">{Math.round(opponentScore?.overallScore || 0)}%</span>
+                    <span className="text-purple-400 font-bold text-lg">{Math.round(opponentScore?.overallScore || 0)}</span>
                   </div>
                   <Progress 
                     value={opponentScore?.overallScore || 0} 
