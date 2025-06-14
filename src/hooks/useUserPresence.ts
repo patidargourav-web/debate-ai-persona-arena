@@ -13,7 +13,7 @@ interface UserPresence {
 }
 
 export const useUserPresence = () => {
-  const [onlineUsers, setOnlineUsers] = useState<UserPresence[]>([]);
+  const [users, setUsers] = useState<UserPresence[]>([]);
   const [loading, setLoading] = useState(true);
   const { user } = useAuth();
   const channelRef = useRef<any>(null);
@@ -35,14 +35,15 @@ export const useUserPresence = () => {
 
     updatePresence();
 
-    // Fetch online users
-    const fetchOnlineUsers = async () => {
+    // Fetch users' presence
+    const fetchUsersPresence = async () => {
       // First get presence data
       const { data: presenceData, error: presenceError } = await supabase
         .from('user_presence')
         .select('*')
-        .eq('is_online', true)
-        .neq('user_id', user.id);
+        .neq('user_id', user.id)
+        .order('is_online', { ascending: false })
+        .order('last_seen', { ascending: false });
 
       if (presenceError) {
         console.error('Error fetching presence:', presenceError);
@@ -51,7 +52,7 @@ export const useUserPresence = () => {
       }
 
       if (!presenceData || presenceData.length === 0) {
-        setOnlineUsers([]);
+        setUsers([]);
         setLoading(false);
         return;
       }
@@ -74,11 +75,11 @@ export const useUserPresence = () => {
         };
       });
 
-      setOnlineUsers(formattedUsers);
+      setUsers(formattedUsers);
       setLoading(false);
     };
 
-    fetchOnlineUsers();
+    fetchUsersPresence();
 
     // Clean up any existing channel completely
     const cleanupChannel = async () => {
@@ -108,7 +109,7 @@ export const useUserPresence = () => {
             table: 'user_presence'
           },
           () => {
-            fetchOnlineUsers();
+            fetchUsersPresence();
           }
         );
 
@@ -156,5 +157,5 @@ export const useUserPresence = () => {
     };
   }, [user]);
 
-  return { onlineUsers, loading };
+  return { users, loading };
 };
