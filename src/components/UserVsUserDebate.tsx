@@ -112,6 +112,60 @@ export const UserVsUserDebate = ({ debateId, onEndDebate }: UserVsUserDebateProp
   }, [debateRequest, user, isConnecting, isInitiator, participantCount]);
   // ^ Include participantCount to allow re-run when another user joins
 
+  // Detect when both refs are mounted and set videoRefsReady
+  useEffect(() => {
+    if (localVideoRef.current && remoteVideoRef.current) {
+      setVideoRefsReady(true);
+      // Set the elements to WebRTC context
+      setLocalVideoElement(localVideoRef.current);
+      setRemoteVideoElement(remoteVideoRef.current);
+      console.log("[VIDEO] Both local and remote refs are mounted, videoRefsReady set to true");
+    } else {
+      setVideoRefsReady(false);
+    }
+  }, [
+    localVideoRef.current,
+    remoteVideoRef.current,
+    setLocalVideoElement,
+    setRemoteVideoElement,
+  ]);
+
+  // --- WebRTC initialization logic ---
+  useEffect(() => {
+    // We can only initialize when all are true:
+    // - User present
+    // - Debate request loaded (so we know initiator)
+    // - participantCount === 2 (both present)
+    // - videoRefsReady (DOM elements mounted)
+    // - Not already connecting
+    if (
+      debateRequest &&
+      user &&
+      videoRefsReady &&
+      !isConnecting &&
+      participantCount === 2
+    ) {
+      // Initiator and receiver both use same logic for max reliability
+      console.log(`[WebRTC] Both videoRefsReady and participantCount==2. Initializing WebRTC. isInitiator: ${isInitiator}`);
+      initializeWebRTC();
+    } else {
+      // Log reasons for not (yet) initializing
+      if (!debateRequest) console.log("[WebRTC] Not initializing: debateRequest missing");
+      if (!user) console.log("[WebRTC] Not initializing: user missing");
+      if (!videoRefsReady) console.log("[WebRTC] Not initializing: videoRefsReady is false");
+      if (isConnecting) console.log("[WebRTC] Not initializing: isConnecting is true");
+      if (participantCount < 2) console.log(`[WebRTC] Not initializing: participantCount=${participantCount}`);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    debateRequest,
+    user,
+    isConnecting,
+    participantCount,
+    videoRefsReady,
+    isInitiator, // for debug
+  ]);
+
   // Set video elements when refs are available
   useEffect(() => {
     if (localVideoRef.current) {
