@@ -8,7 +8,6 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useWebRTC } from '@/hooks/useWebRTC';
 import { Mic, MicOff, Video, VideoOff } from 'lucide-react';
-import { LiveKitDebateVideo } from '@/components/LiveKitDebateVideo';
 
 interface UserVsUserDebateProps {
   debateId: string;
@@ -75,10 +74,9 @@ export const UserVsUserDebate = ({ debateId, onEndDebate }: UserVsUserDebateProp
     isInitiator
   });
 
-  useEffect(() => {
-    fetchDebateRequest();
-  }, [debateId]);
-
+  // --- PATCH: DEBOUNCE/DELAY INITIALIZING WEBRTC FOR RECEIVER (important!) ---
+  // The sender (initiator) can initialize immediately.
+  // The receiver should wait for signaling subscription and opponent presence.
   useEffect(() => {
     if (debateRequest && user) {
       initializeScores();
@@ -86,6 +84,30 @@ export const UserVsUserDebate = ({ debateId, onEndDebate }: UserVsUserDebateProp
       startDebate();
     }
   }, [debateRequest, user]);
+
+  useEffect(() => {
+    // Only start once real-time channel exists and at least one other participant is detected
+    if (debateRequest && user && !isConnecting) {
+      if (isInitiator) {
+        // Sender starts immediately
+        console.log('[WebRTC] I am initiator, starting immediately...');
+        initializeWebRTC();
+      } else {
+        // Receiver: wait to ensure signaling and presence is ready before initializing
+        if (participantCount >= 2) {
+          console.log('[WebRTC] I am receiver. Both present! Initializing WebRTC after small delay...');
+          setTimeout(() => {
+            initializeWebRTC();
+          }, 600); // Increased delay for more reliability
+        } else {
+          // Not enough participants in the room yet, log and wait for future effect runs
+          console.log('[WebRTC] Receiver waiting for both participants to arrive before initializing...');
+        }
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [debateRequest, user, isConnecting, isInitiator, participantCount]);
+  // ^ Include participantCount to allow re-run when another user joins
 
   // Set video elements when refs are available
   useEffect(() => {
@@ -464,15 +486,160 @@ export const UserVsUserDebate = ({ debateId, onEndDebate }: UserVsUserDebateProp
       <div className="flex flex-col xl:flex-row h-[calc(100vh-120px)]">
         {/* Real-time Video Conference Area */}
         <div className="flex-1 p-6">
-          <div className="h-full w-full">
-            {/* Render the LiveKit video component immediately when debateRequest & user exist */}
-            <LiveKitDebateVideo
-              roomName={debateId}
-              userId={user.id}
-              displayName={user.email?.split('@')[0] || user.id}
-              isMuted={false}
-              isCameraEnabled={true}
-            />
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 h-full">
+            {/* User's Real Video Feed */}
+            <Card className="bg-gradient-to-br from-blue-900/50 to-purple-900/50 backdrop-blur-lg border-blue-500/30 p-6 relative overflow-hidden">
+              <div className="absolute inset-0 bg-gradient-to-br from-blue-600/10 to-purple-600/10"></div>
+              <div className="relative z-10">
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center gap-3">
+                    <div className="w-3 h-3 bg-blue-500 rounded-full animate-pulse"></div>
+                    <h3 className="text-white font-bold text-lg">You</h3>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <Badge className={`${activeDebater === user?.id ? 'bg-green-500 animate-pulse' : 'bg-gray-600'} text-white`}>
+                      {activeDebater === user?.id ? '🎤 Speaking' : '👂 Listening'}
+                    </Badge>
+                    <Button
+                      size="sm"
+                      variant={isAudioEnabled ? "default" : "destructive"}
+                      onClick={toggleMicrophone}
+                      className="w-8 h-8 p-0"
+                    >
+                      {isAudioEnabled ? <Mic className="w-4 h-4" /> : <MicOff className="w-4 h-4" />}
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant={isVideoEnabled ? "default" : "destructive"}
+                      onClick={toggleCamera}
+                      className="w-8 h-8 p-0"
+                    >
+                      {isVideoEnabled ? <Video className="w-4 h-4" /> : <VideoOff className="w-4 h-4" />}
+                    </Button>
+                  </div>
+                </div>
+                
+                <div className="aspect-video bg-black rounded-xl flex items-center justify-center relative border border-blue-500/30 overflow-hidden">
+                  <video
+                    ref={localVideoRef}
+                    autoPlay
+                    muted
+                    playsInline
+                    className="w-full h-full object-cover rounded-xl"
+                  />
+                  
+                  {!localStream && (
+                    <div className="absolute inset-0 bg-gradient-to-br from-blue-600/20 to-purple-600/20 rounded-xl flex items-center justify-center">
+                      <div className="text-center">
+                        <div className="w-32 h-32 bg-gradient-to-br from-blue-500 to-purple-500 rounded-full flex items-center justify-center text-4xl mb-4 mx-auto shadow-2xl">
+                          👤
+                        </div>
+                        <p className="text-white font-semibold text-lg">Connecting Camera...</p>
+                        <p className="text-blue-200 text-sm">Please allow camera access</p>
+                      </div>
+                    </div>
+                  )}
+                  
+                  {activeDebater === user?.id && (
+                    <div className="absolute top-4 right-4 bg-red-500 text-white px-3 py-2 rounded-lg text-sm font-bold animate-pulse shadow-lg">
+                      🔴 LIVE
+                    </div>
+                  )}
+                  
+                  {/* Enhanced AI Analysis Overlay */}
+                  <div className="absolute bottom-4 left-4 right-4 bg-black/80 backdrop-blur-lg rounded-lg p-3 border border-blue-500/30">
+                    <div className="flex justify-between text-xs text-white">
+                      <span>Performance: {Math.round(myScore?.overallScore || 0)}%</span>
+                      <span>Clarity: {Math.round(myScore?.clarity || 0)}%</span>
+                      <span className={`${connectionState === 'connected' ? 'text-green-400' : 'text-yellow-400'}`}>
+                        📡 {connectionState === 'connected' ? 'HD' : 'Connecting'}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+                
+                {/* Enhanced Score Display */}
+                <div className="mt-4 space-y-3">
+                  <div className="flex justify-between text-sm">
+                    <span className="text-blue-200">Overall Performance</span>
+                    <span className="text-green-400 font-bold text-lg">{Math.round(myScore?.overallScore || 0)}%</span>
+                  </div>
+                  <Progress 
+                    value={myScore?.overallScore || 0} 
+                    className="h-3 bg-slate-800/50 border border-blue-500/30" 
+                  />
+                </div>
+              </div>
+            </Card>
+
+            {/* Opponent's Real Video Feed */}
+            <Card className="bg-gradient-to-br from-purple-900/50 to-pink-900/50 backdrop-blur-lg border-purple-500/30 p-6 relative overflow-hidden">
+              <div className="absolute inset-0 bg-gradient-to-br from-purple-600/10 to-pink-600/10"></div>
+              <div className="relative z-10">
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center gap-3">
+                    <div className={`w-3 h-3 rounded-full ${remoteStream ? 'bg-purple-500 animate-pulse' : 'bg-yellow-500'}`}></div>
+                    <h3 className="text-white font-bold text-lg">{getOpponentName()}</h3>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <Badge className={`${activeDebater === getOpponentId() ? 'bg-green-500 animate-pulse' : 'bg-gray-600'} text-white`}>
+                      {activeDebater === getOpponentId() ? '🎤 Speaking' : '👂 Listening'}
+                    </Badge>
+                    <div className={`w-3 h-3 rounded-full ${remoteStream ? 'bg-green-400 animate-pulse' : 'bg-yellow-400'}`}></div>
+                  </div>
+                </div>
+                
+                <div className="aspect-video bg-black rounded-xl flex items-center justify-center relative border border-purple-500/30 overflow-hidden">
+                  <video
+                    ref={remoteVideoRef}
+                    autoPlay
+                    playsInline
+                    className="w-full h-full object-cover rounded-xl"
+                  />
+                  
+                  {!remoteStream && (
+                    <div className="absolute inset-0 bg-gradient-to-br from-purple-600/20 to-pink-600/20 rounded-xl flex items-center justify-center">
+                      <div className="text-center">
+                        <div className="w-32 h-32 bg-gradient-to-br from-purple-500 to-pink-500 rounded-full flex items-center justify-center text-4xl mb-4 mx-auto shadow-2xl">
+                          👤
+                        </div>
+                        <p className="text-white font-semibold text-lg">{getOpponentName()}</p>
+                        <p className="text-yellow-400 text-sm animate-pulse">⏳ Waiting for video...</p>
+                      </div>
+                    </div>
+                  )}
+                  
+                  {activeDebater === getOpponentId() && (
+                    <div className="absolute top-4 right-4 bg-red-500 text-white px-3 py-2 rounded-lg text-sm font-bold animate-pulse shadow-lg">
+                      🔴 LIVE
+                    </div>
+                  )}
+                  
+                  {/* AI Analysis Overlay */}
+                  <div className="absolute bottom-4 left-4 right-4 bg-black/80 backdrop-blur-lg rounded-lg p-3 border border-purple-500/30">
+                    <div className="flex justify-between text-xs text-white">
+                      <span>Performance: {Math.round(opponentScore?.overallScore || 0)}%</span>
+                      <span>Clarity: {Math.round(opponentScore?.clarity || 0)}%</span>
+                      <span className={`${remoteStream ? 'text-green-400' : 'text-yellow-400'}`}>
+                        📡 {remoteStream ? 'HD' : 'Connecting'}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+                
+                {/* Enhanced Score Display */}
+                <div className="mt-4 space-y-3">
+                  <div className="flex justify-between text-sm">
+                    <span className="text-purple-200">Overall Performance</span>
+                    <span className="text-purple-400 font-bold text-lg">{Math.round(opponentScore?.overallScore || 0)}</span>
+                  </div>
+                  <Progress 
+                    value={opponentScore?.overallScore || 0} 
+                    className="h-3 bg-slate-800/50 border border-purple-500/30" 
+                  />
+                </div>
+              </div>
+            </Card>
           </div>
         </div>
 
