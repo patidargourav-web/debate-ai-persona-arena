@@ -1,4 +1,3 @@
-
 import React, { useEffect } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useNavigate } from "react-router-dom";
@@ -58,7 +57,8 @@ const Landing: React.FC = () => {
         className={`relative min-h-screen flex flex-col items-center justify-center overflow-hidden px-4 py-12 ${gradientBg}`}
         style={{
           background:
-            "radial-gradient(ellipse at 60% 10%, rgba(32,52,54,0.22) 0%, transparent 90%), linear-gradient(135deg, #10152b 0%, #191c24 60%, #0e1413 100%)",
+            "radial-gradient(ellipse at 60% 10%, rgba(17,22,26,0.33) 0%, transparent 90%), linear-gradient(135deg, #0b0e16 0%, #0c0e13 90%)",
+          // darker base
         }}
       >
         {/* Spotlight/dark underlay */}
@@ -95,7 +95,11 @@ const Landing: React.FC = () => {
             </div>
           </SpotlightReveal>
           {/* CTA Buttons */}
-          <SpotlightReveal radius={260} className="flex flex-col sm:flex-row gap-4 justify-center items-center mb-16 animate-slide-up w-full sm:w-auto" style={{ animationDelay: "0.22s" }}>
+          <SpotlightReveal
+            radius={260}
+            className="flex flex-col sm:flex-row gap-4 justify-center items-center mb-16 animate-slide-up w-full sm:w-auto"
+            style={{ animationDelay: "0.22s" }}
+          >
             <Button
               onClick={handleSignUp}
               className="btn-primary text-lg px-8 py-4 w-full sm:w-auto animate-glow drop-shadow-lg"
@@ -128,7 +132,7 @@ const Landing: React.FC = () => {
             ))}
           </div>
           {/* Extra Section: Call to Action */}
-          <SpotlightReveal radius={300} className="w-full max-w-2xl text-center mt-2 mb-16">
+          <SpotlightReveal radius={300} className="w-full max-w-2xl text-center mt-2 mb-16" style={{ animationDelay: "0.6s" }}>
             <div className="card-modern py-8 px-6 sm:px-12 bg-background/90 border border-primary/30 rounded-2xl shadow-lg hover:shadow-2xl transition-shadow duration-200 animate-fade-in" style={{ animationDelay: "0.6s" }}>
               <span className="text-2xl font-bold text-primary block mb-2">🚀 Ready to level up your debating?</span>
               <span className="text-muted-foreground leading-relaxed">

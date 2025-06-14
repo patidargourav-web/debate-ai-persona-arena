@@ -1,54 +1,74 @@
 
-import React, { useRef, useEffect, useState } from "react";
+import React, { useRef, useEffect, useState, CSSProperties } from "react";
 import { useSpotlight } from "./SpotlightContext";
 
 type SpotlightRevealProps = {
   children: React.ReactNode;
   className?: string;
-  // Optionally tweak trigger distance for the gradient
   radius?: number;
+  style?: React.CSSProperties;
 };
+
 
 const DEFAULT_RADIUS = 200;
 
-// This component increases its brightness when the spotlight is near it.
+/**
+ * This component reveals its children ONLY where the spotlight falls over it,
+ * using a dynamic CSS mask. The reveal follows the moving spotlight cursor, 
+ * so only the lit area is clearly visible, with a smooth transparent fade outward.
+ */
 export const SpotlightReveal: React.FC<SpotlightRevealProps> = ({
   children,
   className = "",
   radius = DEFAULT_RADIUS,
+  style = {},
 }) => {
   const ref = useRef<HTMLDivElement>(null);
   const { position, visible } = useSpotlight();
-  const [isLit, setLit] = useState(false);
+  const [maskPosition, setMaskPosition] = useState({ x: -9999, y: -9999, width: 0, height: 0 });
 
+  // Update the mask's local position relative to the element
   useEffect(() => {
-    if (!visible || !ref.current) {
-      setLit(false);
+    if (!ref.current || !visible) {
+      setMaskPosition({ x: -9999, y: -9999, width: 0, height: 0 });
       return;
     }
     const rect = ref.current.getBoundingClientRect();
-    const cx = rect.left + rect.width / 2;
-    const cy = rect.top + rect.height / 2;
-    const dist = Math.sqrt(Math.pow(cx - position.x, 2) + Math.pow(cy - position.y, 2));
-    setLit(dist < radius);
-  }, [position, visible, radius]);
+    setMaskPosition({
+      x: position.x - rect.left,
+      y: position.y - rect.top,
+      width: rect.width,
+      height: rect.height,
+    });
+  }, [position, visible]);
 
-  // Lighting up: stronger when cursor is closer, smooth transition.
-  const style: React.CSSProperties = {
-    transition: "filter 0.24s cubic-bezier(0.29,0.9,0.47,1), box-shadow 0.26s cubic-bezier(0.29,0.9,0.47,1)",
-    filter: isLit
-      ? "brightness(1.45) saturate(1.14) drop-shadow(0 0 24px hsl(var(--primary) / 0.26))"
-      : "brightness(0.62) saturate(0.95)",
-    boxShadow: isLit
-      ? "0 2px 32px 0 hsl(var(--primary) / 0.11)"
-      : "none",
+  // Only show the part within the spotlight circle with a smooth fade at the edge.
+  // Use CSS mask or Webkit mask for broad browser support.
+  // We use a radial-gradient, center matching the maskPosition.
+  const maskGradient = `radial-gradient(circle ${radius}px at ${maskPosition.x}px ${maskPosition.y}px, 
+    rgba(255,255,255,1) 0%, 
+    rgba(255,255,255,0.8) 66%, 
+    rgba(255,255,255,0) 100%
+  )`;
+
+  // When not visible, fallback to a very dim/hidden state.
+  const mergedStyle: CSSProperties = {
+    ...style,
+    WebkitMaskImage: visible ? maskGradient : undefined,
+    maskImage: visible ? maskGradient : undefined,
+    transition: "filter 0.22s cubic-bezier(0.29,0.9,0.47,1), box-shadow 0.23s cubic-bezier(0.29,0.9,0.47,1), mask-image 0.3s, -webkit-mask-image 0.3s",
+    filter: visible ? "brightness(1.02)" : "brightness(0.44) saturate(0.92)",
+    opacity: visible ? 1 : 0.72,
     zIndex: 21,
+    position: "relative",
   };
+
   return (
-    <div ref={ref} className={className} style={style}>
+    <div ref={ref} className={className} style={mergedStyle}>
       {children}
     </div>
   );
 };
 
 export default SpotlightReveal;
+

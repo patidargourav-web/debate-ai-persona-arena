@@ -4,15 +4,40 @@ import { SpotlightContext } from "./SpotlightContext";
 
 /**
  * Provides a moving spotlight effect and context for all spotlight-aware components.
+ * The spotlight follows the cursor with springy/lerp motion for realism.
  */
 export const SpotlightCursor: React.FC<{ children?: React.ReactNode }> = ({ children }) => {
   const [position, setPosition] = useState({ x: -9999, y: -9999 });
   const [visible, setVisible] = useState(false);
   const spotlightRef = useRef<HTMLDivElement>(null);
 
+  // Store the "target" mouse position, and the "current" springy/lerped position
+  const mouse = useRef({ x: -9999, y: -9999 });
+  const lerpPosition = useRef({ x: -9999, y: -9999 });
+
+  // Animate the "lerp"/spring towards the current mouse position
+  useEffect(() => {
+    let frame: number;
+    const animate = () => {
+      // Linear interpolation
+      lerpPosition.current.x += (mouse.current.x - lerpPosition.current.x) * 0.18;
+      lerpPosition.current.y += (mouse.current.y - lerpPosition.current.y) * 0.18;
+
+      setPosition({
+        x: lerpPosition.current.x,
+        y: lerpPosition.current.y,
+      });
+
+      frame = requestAnimationFrame(animate);
+    };
+    animate();
+    return () => cancelAnimationFrame(frame);
+  }, []);
+
+  // Listen to mouse
   useEffect(() => {
     const moveSpotlight = (e: MouseEvent) => {
-      setPosition({ x: e.clientX, y: e.clientY });
+      mouse.current = { x: e.clientX, y: e.clientY };
       setVisible(true);
     };
     const hideSpotlight = () => setVisible(false);
@@ -26,7 +51,7 @@ export const SpotlightCursor: React.FC<{ children?: React.ReactNode }> = ({ chil
     };
   }, []);
 
-  const size = 360;
+  const size = 350;
 
   return (
     <SpotlightContext.Provider value={{ position, visible }}>
@@ -55,9 +80,9 @@ export const SpotlightCursor: React.FC<{ children?: React.ReactNode }> = ({ chil
             height: size,
             pointerEvents: "none",
             borderRadius: "50%",
-            background: `radial-gradient(circle at center, hsla(142, 76%, 36%, 0.55) 0%, hsla(241,85%,52%,0.07) 36%, transparent 85%)`,
+            background: `radial-gradient(circle at center, hsla(142, 76%, 36%, 0.70) 0%, hsla(241,85%,52%,0.22) 42%, transparent 95%)`,
             filter: "blur(32px)",
-            transition: "left 0.17s cubic-bezier(.25,.8,.25,1), top 0.17s cubic-bezier(.25,.8,.25,1)",
+            transition: "left 0.13s cubic-bezier(.25,.8,.25,1), top 0.13s cubic-bezier(.25,.8,.25,1)",
             transform: "translateZ(0)",
           }}
         />
@@ -68,3 +93,4 @@ export const SpotlightCursor: React.FC<{ children?: React.ReactNode }> = ({ chil
 };
 
 export default SpotlightCursor;
+
