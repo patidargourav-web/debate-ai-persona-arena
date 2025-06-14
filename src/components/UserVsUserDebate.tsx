@@ -74,6 +74,9 @@ export const UserVsUserDebate = ({ debateId, onEndDebate }: UserVsUserDebateProp
     isInitiator
   });
 
+  // New: state to track if both refs are set
+  const [videoRefsReady, setVideoRefsReady] = useState(false);
+
   // --- PATCH: DEBOUNCE/DELAY INITIALIZING WEBRTC FOR RECEIVER (important!) ---
   // The sender (initiator) can initialize immediately.
   // The receiver should wait for signaling subscription and opponent presence.
