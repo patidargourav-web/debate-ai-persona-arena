@@ -1,8 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Button } from '@/components/ui/button';
-import { Card } from '@/components/ui/card';
+import { HomeLandingPage } from '@/components/HomeLandingPage';
 import { VideoInterface } from '@/components/VideoInterface';
 import { RealTimeAnalysisPanel } from '@/components/RealTimeAnalysisPanel';
 import { EnhancedLeaderboard } from '@/components/EnhancedLeaderboard';
@@ -138,102 +137,11 @@ const Index = () => {
         );
       default:
         return (
-          <div className="min-h-screen bg-background">
-            <div className="container mx-auto px-4 py-6 lg:py-12">
-              <Navigation currentView={currentView} onViewChange={setCurrentView} />
-              
-              {/* Hero Section */}
-              <div className="text-center space-y-8 max-w-4xl mx-auto animate-slide-up">
-                <div className="space-y-6">
-                  <h1 className="text-display gradient-text animate-float">
-                    Debatrix AI
-                  </h1>
-                  <p className="text-subheading text-muted-foreground max-w-2xl mx-auto leading-relaxed">
-                    Master the art of debate with our AI-powered platform. Get real-time analysis, 
-                    personalized feedback, and compete globally.
-                  </p>
-                </div>
-                
-                {/* CTA Buttons */}
-                <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
-                  <Button 
-                    onClick={startDebate}
-                    className="btn-primary text-lg px-8 py-4 w-full sm:w-auto animate-glow"
-                  >
-                    🎯 Start AI Debate
-                  </Button>
-                  <Button 
-                    onClick={() => setCurrentView('user-debates')}
-                    className="btn-secondary text-lg px-8 py-4 w-full sm:w-auto"
-                  >
-                    🥊 Challenge Users
-                  </Button>
-                  <Button 
-                    onClick={() => setCurrentView('leaderboard')}
-                    className="btn-ghost text-lg px-8 py-4 w-full sm:w-auto"
-                  >
-                    🏆 View Leaderboard
-                  </Button>
-                </div>
-              </div>
-
-              {/* Features Grid */}
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mt-16 lg:mt-24">
-                <Card className="card-feature text-center p-6 animate-fade-in">
-                  <div className="text-4xl mb-4 animate-float">🤖</div>
-                  <h3 className="text-heading text-foreground mb-3">AI Opponent</h3>
-                  <p className="text-body text-muted-foreground">
-                    Debate against sophisticated AI with realistic responses and adaptive arguments
-                  </p>
-                </Card>
-                
-                <Card className="card-feature text-center p-6 animate-fade-in" style={{animationDelay: '0.1s'}}>
-                  <div className="text-4xl mb-4 animate-float" style={{animationDelay: '1s'}}>🥊</div>
-                  <h3 className="text-heading text-foreground mb-3">User vs User</h3>
-                  <p className="text-body text-muted-foreground">
-                    Challenge other users in real-time debates and test your skills against human opponents
-                  </p>
-                </Card>
-                
-                <Card className="card-feature text-center p-6 animate-fade-in" style={{animationDelay: '0.2s'}}>
-                  <div className="text-4xl mb-4 animate-float" style={{animationDelay: '2s'}}>📊</div>
-                  <h3 className="text-heading text-foreground mb-3">Performance Insights</h3>
-                  <p className="text-body text-muted-foreground">
-                    Detailed analytics on clarity, structure, and persuasiveness of your arguments
-                  </p>
-                </Card>
-                
-                <Card className="card-feature text-center p-6 animate-fade-in" style={{animationDelay: '0.3s'}}>
-                  <div className="text-4xl mb-4 animate-float" style={{animationDelay: '3s'}}>🏆</div>
-                  <h3 className="text-heading text-foreground mb-3">Global Competition</h3>
-                  <p className="text-body text-muted-foreground">
-                    Compete with debaters worldwide and climb the live leaderboard rankings
-                  </p>
-                </Card>
-              </div>
-
-              {/* Stats Section */}
-              <div className="mt-16 lg:mt-24">
-                <div className="card-modern text-center max-w-3xl mx-auto">
-                  <h2 className="text-heading mb-8">Join the Debate Revolution</h2>
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-8">
-                    <div className="space-y-2">
-                      <div className="text-4xl font-bold text-primary">1000+</div>
-                      <p className="text-muted-foreground">Active Debaters</p>
-                    </div>
-                    <div className="space-y-2">
-                      <div className="text-4xl font-bold text-primary">50k+</div>
-                      <p className="text-muted-foreground">Debates Completed</p>
-                    </div>
-                    <div className="space-y-2">
-                      <div className="text-4xl font-bold text-primary">98%</div>
-                      <p className="text-muted-foreground">Skill Improvement</p>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
+          <HomeLandingPage 
+            onStartDebate={startDebate}
+            onUserDebates={() => setCurrentView('user-debates')}
+            onLeaderboard={() => setCurrentView('leaderboard')}
+          />
         );
     }
   };
@@ -242,3 +150,4 @@ const Index = () => {
 };
 
 export default Index;
+
