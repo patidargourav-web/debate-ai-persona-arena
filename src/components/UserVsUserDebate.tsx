@@ -498,20 +498,20 @@ export const UserVsUserDebate = ({ debateId, onEndDebate }: UserVsUserDebateProp
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900">
-      {/* Enhanced Header with WebRTC Status */}
-      <div className="p-6 bg-black/30 backdrop-blur-lg border-b border-purple-500/20">
-        <div className="flex justify-between items-center">
-          <div className="text-white">
-            <div className="flex items-center gap-3 mb-2">
-              <div className="w-3 h-3 bg-red-500 rounded-full animate-pulse"></div>
-              <h2 className="text-2xl font-bold bg-gradient-to-r from-purple-400 to-blue-400 bg-clip-text text-transparent">
+      {/* Enhanced Header with WebRTC Status - Mobile Responsive */}
+      <div className="mobile-spacing-sm bg-black/30 backdrop-blur-lg border-b border-purple-500/20">
+        <div className="flex flex-col lg:flex-row lg:justify-between lg:items-center gap-4">
+          <div className="text-white min-w-0">
+            <div className="flex items-start lg:items-center gap-2 lg:gap-3 mb-2">
+              <div className="w-3 h-3 bg-red-500 rounded-full animate-pulse shrink-0 mt-1 lg:mt-0"></div>
+              <h2 className="mobile-heading-responsive font-bold bg-gradient-to-r from-purple-400 to-blue-400 bg-clip-text text-transparent leading-tight">
                 🎯 Live Video Debate Arena
               </h2>
             </div>
-            <p className="text-slate-300 text-lg font-medium">
+            <p className="text-slate-300 mobile-text-responsive font-medium mb-2 lg:mb-0 break-words">
               {debateRequest.topic}
             </p>
-            <div className="flex items-center gap-6 text-sm mt-2">
+            <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-6 mobile-text-responsive mt-2">
               <div className={`flex items-center gap-2 ${getConnectionStatusColor()}`}>
                 <div className={`w-2 h-2 rounded-full ${connectionState === 'connected' ? 'bg-green-400 animate-pulse' : connectionState === 'connecting' ? 'bg-yellow-400 animate-pulse' : 'bg-red-400'}`}></div>
                 {getConnectionStatusText()}
@@ -521,51 +521,57 @@ export const UserVsUserDebate = ({ debateId, onEndDebate }: UserVsUserDebateProp
               </div>
             </div>
           </div>
-          <div className="flex items-center gap-4">
-            <div className="text-center bg-black/40 px-6 py-3 rounded-xl border border-purple-500/30">
-              <div className="text-2xl font-mono text-white">⏱️ {formatTime(debateTimer)}</div>
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 sm:gap-4">
+            <div className="text-center bg-black/40 mobile-spacing-sm rounded-xl border border-purple-500/30">
+              <div className="mobile-text-lg sm:text-xl lg:text-2xl font-mono text-white">⏱️ {formatTime(debateTimer)}</div>
               <div className="text-xs text-slate-400">Debate Time</div>
             </div>
-            <Button onClick={endDebate} variant="destructive" className="bg-red-600 hover:bg-red-700">
+            <Button 
+              onClick={endDebate} 
+              variant="destructive" 
+              className="bg-red-600 hover:bg-red-700 mobile-touch-target"
+            >
               End Debate
             </Button>
           </div>
         </div>
       </div>
 
-      <div className="flex flex-col xl:flex-row h-[calc(100vh-120px)]">
+      <div className="flex flex-col xl:flex-row min-h-0">
         {/* Real-time Video Conference Area */}
-        <div className="flex-1 p-6">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 h-full">
+        <div className="flex-1 mobile-spacing-sm">
+          <div className="grid grid-cols-1 lg:grid-cols-2 mobile-gap-responsive h-full min-h-[50vh] xl:min-h-[calc(100vh-180px)]">
             {/* User's Real Video Feed */}
-            <Card className="bg-gradient-to-br from-blue-900/50 to-purple-900/50 backdrop-blur-lg border-blue-500/30 p-6 relative overflow-hidden">
+            <Card className="bg-gradient-to-br from-blue-900/50 to-purple-900/50 backdrop-blur-lg border-blue-500/30 mobile-spacing-sm relative overflow-hidden">
               <div className="absolute inset-0 bg-gradient-to-br from-blue-600/10 to-purple-600/10"></div>
               <div className="relative z-10">
-                <div className="flex items-center justify-between mb-4">
-                  <div className="flex items-center gap-3">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-3 sm:mb-4 gap-2">
+                  <div className="flex items-center gap-2 sm:gap-3">
                     <div className="w-3 h-3 bg-blue-500 rounded-full animate-pulse"></div>
-                    <h3 className="text-white font-bold text-lg">You</h3>
+                    <h3 className="text-white font-bold mobile-text-responsive">You</h3>
                   </div>
-                  <div className="flex items-center gap-3">
-                    <Badge className={`${activeDebater === user?.id ? 'bg-green-500 animate-pulse' : 'bg-gray-600'} text-white`}>
+                  <div className="flex items-center justify-between sm:justify-end gap-2 sm:gap-3">
+                    <Badge className={`${activeDebater === user?.id ? 'bg-green-500 animate-pulse' : 'bg-gray-600'} text-white text-xs`}>
                       {activeDebater === user?.id ? '🎤 Speaking' : '👂 Listening'}
                     </Badge>
-                    <Button
-                      size="sm"
-                      variant={isAudioEnabled ? "default" : "destructive"}
-                      onClick={toggleMicrophone}
-                      className="w-8 h-8 p-0"
-                    >
-                      {isAudioEnabled ? <Mic className="w-4 h-4" /> : <MicOff className="w-4 h-4" />}
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant={isVideoEnabled ? "default" : "destructive"}
-                      onClick={toggleCamera}
-                      className="w-8 h-8 p-0"
-                    >
-                      {isVideoEnabled ? <Video className="w-4 h-4" /> : <VideoOff className="w-4 h-4" />}
-                    </Button>
+                    <div className="flex gap-2">
+                      <Button
+                        size="sm"
+                        variant={isAudioEnabled ? "default" : "destructive"}
+                        onClick={toggleMicrophone}
+                        className="mobile-touch-target w-8 h-8 sm:w-10 sm:h-10 p-0"
+                      >
+                        {isAudioEnabled ? <Mic className="w-3 h-3 sm:w-4 sm:h-4" /> : <MicOff className="w-3 h-3 sm:w-4 sm:h-4" />}
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant={isVideoEnabled ? "default" : "destructive"}
+                        onClick={toggleCamera}
+                        className="mobile-touch-target w-8 h-8 sm:w-10 sm:h-10 p-0"
+                      >
+                        {isVideoEnabled ? <Video className="w-3 h-3 sm:w-4 sm:h-4" /> : <VideoOff className="w-3 h-3 sm:w-4 sm:h-4" />}
+                      </Button>
+                    </div>
                   </div>
                 </div>
                 
@@ -623,16 +629,16 @@ export const UserVsUserDebate = ({ debateId, onEndDebate }: UserVsUserDebateProp
             </Card>
 
             {/* Opponent's Real Video Feed */}
-            <Card className="bg-gradient-to-br from-purple-900/50 to-pink-900/50 backdrop-blur-lg border-purple-500/30 p-6 relative overflow-hidden">
+            <Card className="bg-gradient-to-br from-purple-900/50 to-pink-900/50 backdrop-blur-lg border-purple-500/30 mobile-spacing-sm relative overflow-hidden">
               <div className="absolute inset-0 bg-gradient-to-br from-purple-600/10 to-pink-600/10"></div>
               <div className="relative z-10">
-                <div className="flex items-center justify-between mb-4">
-                  <div className="flex items-center gap-3">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-3 sm:mb-4 gap-2">
+                  <div className="flex items-center gap-2 sm:gap-3">
                     <div className={`w-3 h-3 rounded-full ${remoteStream ? 'bg-purple-500 animate-pulse' : 'bg-yellow-500'}`}></div>
-                    <h3 className="text-white font-bold text-lg">{getOpponentName()}</h3>
+                    <h3 className="text-white font-bold mobile-text-responsive">{getOpponentName()}</h3>
                   </div>
-                  <div className="flex items-center gap-3">
-                    <Badge className={`${activeDebater === getOpponentId() ? 'bg-green-500 animate-pulse' : 'bg-gray-600'} text-white`}>
+                  <div className="flex items-center justify-between sm:justify-end gap-2 sm:gap-3">
+                    <Badge className={`${activeDebater === getOpponentId() ? 'bg-green-500 animate-pulse' : 'bg-gray-600'} text-white text-xs`}>
                       {activeDebater === getOpponentId() ? '🎤 Speaking' : '👂 Listening'}
                     </Badge>
                     <div className={`w-3 h-3 rounded-full ${remoteStream ? 'bg-green-400 animate-pulse' : 'bg-yellow-400'}`}></div>
@@ -693,11 +699,11 @@ export const UserVsUserDebate = ({ debateId, onEndDebate }: UserVsUserDebateProp
           </div>
         </div>
 
-        {/* Enhanced Real-time Analysis Panel */}
-        <div className="w-full xl:w-96 bg-black/40 backdrop-blur-lg border-l border-purple-500/20 p-6 overflow-y-auto">
-          <h3 className="text-white font-bold mb-6 flex items-center gap-3 text-xl">
+        {/* Enhanced Real-time Analysis Panel - Mobile Responsive */}
+        <div className="w-full xl:w-96 bg-black/40 backdrop-blur-lg border-t xl:border-t-0 xl:border-l border-purple-500/20 mobile-spacing-sm overflow-y-auto max-h-[50vh] xl:max-h-none">
+          <h3 className="text-white font-bold mb-4 sm:mb-6 flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 mobile-text-responsive">
             🧠 AI Analysis Dashboard
-            <Badge variant="outline" className="border-green-500 text-green-400 animate-pulse">
+            <Badge variant="outline" className="border-green-500 text-green-400 animate-pulse w-fit">
               LIVE
             </Badge>
           </h3>

@@ -110,20 +110,20 @@ const Auth = () => {
   };
 
   return (
-    <div className="min-h-screen bg-background flex items-center justify-center p-4">
+    <div className="min-h-screen bg-background flex items-center justify-center mobile-spacing">
       <div className="w-full max-w-md">
         {/* Logo/Brand */}
-        <div className="text-center mb-8 animate-slide-up">
-          <h1 className="text-4xl font-bold gradient-text mb-2">Debatrix AI</h1>
-          <p className="text-muted-foreground">Your debate skills journey starts here</p>
+        <div className="text-center mb-6 sm:mb-8 animate-slide-up">
+          <h1 className="mobile-heading-responsive font-bold gradient-text mb-2">Debatrix AI</h1>
+          <p className="mobile-text-responsive text-muted-foreground">Your debate skills journey starts here</p>
         </div>
 
         <Card className="card-modern animate-slide-up" style={{animationDelay: '0.1s'}}>
-          <CardHeader className="text-center space-y-2">
-            <CardTitle className="text-2xl">
+          <CardHeader className="text-center space-y-2 mobile-spacing-sm">
+            <CardTitle className="mobile-text-lg">
               {isSignUp ? 'Create Account' : 'Welcome Back'}
             </CardTitle>
-            <CardDescription className="text-muted-foreground">
+            <CardDescription className="mobile-text-responsive text-muted-foreground">
               {isSignUp 
                 ? 'Join our community of skilled debaters' 
                 : 'Sign in to continue your debate journey'
@@ -131,12 +131,12 @@ const Auth = () => {
             </CardDescription>
           </CardHeader>
           
-          <CardContent>
-            <form onSubmit={isSignUp ? handleSignUp : handleSignIn} className="space-y-6">
+          <CardContent className="mobile-spacing">
+            <form onSubmit={isSignUp ? handleSignUp : handleSignIn} className="space-y-4 sm:space-y-6">
               {isSignUp && (
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 gap-4">
                   <div className="space-y-2">
-                    <Label htmlFor="firstName" className="text-sm font-medium">
+                    <Label htmlFor="firstName" className="mobile-text-responsive font-medium">
                       First Name
                     </Label>
                     <Input
@@ -145,12 +145,12 @@ const Auth = () => {
                       value={firstName}
                       onChange={(e) => setFirstName(e.target.value)}
                       required
-                      className="h-11"
+                      className="mobile-touch-target"
                       placeholder="John"
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="lastName" className="text-sm font-medium">
+                    <Label htmlFor="lastName" className="mobile-text-responsive font-medium">
                       Last Name
                     </Label>
                     <Input
@@ -159,7 +159,7 @@ const Auth = () => {
                       value={lastName}
                       onChange={(e) => setLastName(e.target.value)}
                       required
-                      className="h-11"
+                      className="mobile-touch-target"
                       placeholder="Doe"
                     />
                   </div>
@@ -167,7 +167,7 @@ const Auth = () => {
               )}
               
               <div className="space-y-2">
-                <Label htmlFor="email" className="text-sm font-medium">
+                <Label htmlFor="email" className="mobile-text-responsive font-medium">
                   Email Address
                 </Label>
                 <Input
@@ -176,13 +176,13 @@ const Auth = () => {
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   required
-                  className="h-11"
+                  className="mobile-touch-target"
                   placeholder="john@example.com"
                 />
               </div>
               
               <div className="space-y-2">
-                <Label htmlFor="password" className="text-sm font-medium">
+                <Label htmlFor="password" className="mobile-text-responsive font-medium">
                   Password
                 </Label>
                 <Input
@@ -191,7 +191,7 @@ const Auth = () => {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   required
-                  className="h-11"
+                  className="mobile-touch-target"
                   placeholder="••••••••"
                 />
               </div>
@@ -199,7 +199,7 @@ const Auth = () => {
               <Button
                 type="submit"
                 disabled={loading}
-                className="btn-primary w-full h-11 text-base"
+                className="btn-primary w-full mobile-touch-target mobile-text-responsive"
               >
                 {loading ? (
                   <div className="flex items-center space-x-2">

@@ -186,3 +186,50 @@
     @apply card-modern border-2 border-primary/20 hover:border-primary/40;
   }
 }
+
+/* Mobile-First Responsive Utilities */
+@layer utilities {
+  .mobile-touch-target {
+    @apply min-h-[44px] min-w-[44px];
+  }
+
+  .mobile-text-responsive {
+    @apply text-sm sm:text-base lg:text-lg;
+  }
+
+  .mobile-heading-responsive {
+    @apply text-xl sm:text-2xl lg:text-3xl xl:text-4xl;
+  }
+
+  .mobile-display-responsive {
+    @apply text-3xl sm:text-4xl md:text-5xl lg:text-6xl xl:text-7xl;
+  }
+
+  .mobile-spacing {
+    @apply p-4 sm:p-6 lg:p-8;
+  }
+
+  .mobile-spacing-sm {
+    @apply p-2 sm:p-4 lg:p-6;
+  }
+
+  .mobile-grid-responsive {
+    @apply grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4;
+  }
+
+  .mobile-flex-responsive {
+    @apply flex-col sm:flex-row;
+  }
+
+  .mobile-gap-responsive {
+    @apply gap-4 sm:gap-6 lg:gap-8;
+  }
+
+  .mobile-video-container {
+    @apply flex flex-col lg:flex-row;
+  }
+
+  .mobile-debate-layout {
+    @apply flex flex-col xl:flex-row;
+  }
+}

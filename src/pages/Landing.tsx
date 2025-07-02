@@ -49,54 +49,56 @@ const Landing: React.FC = () => {
   const handleSignIn = () => navigate("/auth");
 
   return (
-    <div className={`relative min-h-screen flex flex-col items-center justify-center overflow-hidden px-4 py-12 ${gradientBg}`}>
-      {/* Animated/Decorative Background Shapes */}
-      <div className={`${accentShape} w-[440px] h-[440px] bg-primary top-[-120px] left-[-120px] animate-float`}></div>
-      <div className={`${accentShape} w-[320px] h-[280px] bg-gradient-to-br from-accent to-secondary right-[-100px] top-1/3 animate-float`} style={{ animationDelay: "1.2s" }}></div>
-      <div className={`${accentShape} w-[200px] h-[140px] bg-muted bottom-10 left-1/2 animate-float`} style={{ animationDelay: "2.4s" }}></div>
+    <div className={`relative min-h-screen flex flex-col items-center justify-center overflow-hidden mobile-spacing ${gradientBg}`}>
+      {/* Animated/Decorative Background Shapes - Hidden on mobile for better performance */}
+      <div className={`${accentShape} w-[240px] h-[240px] sm:w-[320px] sm:h-[320px] lg:w-[440px] lg:h-[440px] bg-primary top-[-60px] sm:top-[-80px] lg:top-[-120px] left-[-60px] sm:left-[-80px] lg:left-[-120px] animate-float hidden sm:block`}></div>
+      <div className={`${accentShape} w-[180px] h-[160px] sm:w-[240px] sm:h-[200px] lg:w-[320px] lg:h-[280px] bg-gradient-to-br from-accent to-secondary right-[-50px] sm:right-[-70px] lg:right-[-100px] top-1/3 animate-float hidden sm:block`} style={{ animationDelay: "1.2s" }}></div>
+      <div className={`${accentShape} w-[120px] h-[80px] sm:w-[160px] sm:h-[100px] lg:w-[200px] lg:h-[140px] bg-muted bottom-10 left-1/2 animate-float hidden sm:block`} style={{ animationDelay: "2.4s" }}></div>
       {/* Main content */}
-      <div className="relative z-10 flex flex-col items-center w-full">
+      <div className="relative z-10 flex flex-col items-center w-full max-w-7xl mx-auto">
         {/* Header */}
-        <div className="text-center mb-12 animate-slide-up w-full">
-          <h1 className="text-6xl sm:text-7xl font-extrabold gradient-text tracking-tighter drop-shadow-lg mb-4 font-sans" style={{ lineHeight: "1.04" }}>
+        <div className="text-center mb-8 sm:mb-12 animate-slide-up w-full">
+          <h1 className="mobile-display-responsive font-extrabold gradient-text tracking-tighter drop-shadow-lg mb-4 font-sans leading-tight">
             Debatrix
           </h1>
-          <p className="text-xl sm:text-2xl max-w-3xl mx-auto text-muted-foreground font-medium animate-fade-in" style={{ animationDelay: "0.4s" }}>
-            <span className="bg-card/70 px-4 py-2 rounded-xl shadow-sm inline-block">
-              The immersive debate platform powered by AI.<br />
-              Elevate your skills, compete, and master the art&nbsp;of&nbsp;argument.
-            </span>
-          </p>
+          <div className="mobile-spacing-sm max-w-4xl mx-auto">
+            <p className="mobile-heading-responsive text-muted-foreground font-medium animate-fade-in" style={{ animationDelay: "0.4s" }}>
+              <span className="bg-card/70 mobile-spacing-sm rounded-xl shadow-sm inline-block leading-relaxed">
+                The immersive debate platform powered by AI.<br className="hidden sm:block" />
+                <span className="block sm:inline"> Elevate your skills, compete, and master the art of argument.</span>
+              </span>
+            </p>
+          </div>
         </div>
         {/* CTA Buttons */}
-        <div className="flex flex-col sm:flex-row gap-4 justify-center items-center mb-16 animate-slide-up" style={{ animationDelay: "0.22s" }}>
+        <div className="flex flex-col sm:flex-row mobile-gap-responsive justify-center items-stretch sm:items-center mb-12 sm:mb-16 animate-slide-up w-full max-w-md sm:max-w-none mx-auto" style={{ animationDelay: "0.22s" }}>
           <Button
             onClick={handleSignUp}
-            className="btn-primary text-lg px-8 py-4 w-full sm:w-auto animate-glow drop-shadow-lg"
+            className="btn-primary mobile-text-responsive mobile-touch-target px-6 sm:px-8 py-3 sm:py-4 w-full sm:w-auto animate-glow drop-shadow-lg"
           >
-            <UserPlus className="mr-2" size={22} />
+            <UserPlus className="mr-2" size={20} />
             Sign Up
           </Button>
           <Button
             onClick={handleSignIn}
-            className="btn-secondary text-lg px-8 py-4 w-full sm:w-auto drop-shadow"
+            className="btn-secondary mobile-text-responsive mobile-touch-target px-6 sm:px-8 py-3 sm:py-4 w-full sm:w-auto drop-shadow"
             variant={"secondary"}
           >
-            <LogIn className="mr-2" size={22} />
+            <LogIn className="mr-2" size={20} />
             Sign In
           </Button>
         </div>
         {/* Features */}
-        <div className="w-full max-w-5xl mx-auto grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-7 mb-20">
+        <div className="w-full max-w-6xl mx-auto grid mobile-grid-responsive mobile-gap-responsive mb-16 sm:mb-20">
           {features.map((feature, idx) => (
             <div
               key={feature.title}
-              className={`card-feature p-7 pt-10 flex flex-col items-center justify-between text-center bg-card/80 rounded-2xl shadow-xl hover:scale-105 transition-transform duration-300 border border-primary/20 animate-fade-in`}
+              className={`card-feature mobile-spacing flex flex-col items-center justify-between text-center bg-card/80 rounded-2xl shadow-xl hover:scale-105 transition-transform duration-300 border border-primary/20 animate-fade-in h-full`}
               style={{ animationDelay: `${0.28 + idx * 0.08}s` }}
             >
-              <div className="text-5xl mb-3 drop-shadow-xl">{feature.emoji}</div>
-              <h3 className="font-semibold text-lg mb-2 text-foreground">{feature.title}</h3>
-              <p className="text-muted-foreground text-base leading-relaxed">{feature.description}</p>
+              <div className="text-4xl sm:text-5xl mb-3 drop-shadow-xl">{feature.emoji}</div>
+              <h3 className="font-semibold mobile-text-lg mb-2 text-foreground">{feature.title}</h3>
+              <p className="text-muted-foreground mobile-text-responsive leading-relaxed">{feature.description}</p>
             </div>
           ))}
         </div>
