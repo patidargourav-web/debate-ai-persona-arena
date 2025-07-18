@@ -7,6 +7,10 @@ import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useWebRTC } from '@/hooks/useWebRTC';
+import { useTranscription } from '@/hooks/useTranscription';
+import { useRealTimeAnalysis } from '@/hooks/useRealTimeAnalysis';
+import { TranscriptionPanel } from '@/components/TranscriptionPanel';
+import { LiveAnalysisPanel } from '@/components/LiveAnalysisPanel';
 import { Mic, MicOff, Video, VideoOff } from 'lucide-react';
 
 interface UserVsUserDebateProps {
@@ -51,6 +55,23 @@ export const UserVsUserDebate = ({ debateId, onEndDebate }: UserVsUserDebateProp
   const channelRef = useRef<any>(null);
   const localVideoRef = useRef<HTMLVideoElement>(null);
   const remoteVideoRef = useRef<HTMLVideoElement>(null);
+
+  // Initialize transcription and analysis
+  const {
+    transcriptions,
+    isRecording,
+    startRecording,
+    stopRecording,
+    addOpponentTranscription,
+    isLoading: transcriptionLoading
+  } = useTranscription(debateId);
+
+  const {
+    liveFeedback,
+    metrics,
+    isAnalyzing,
+    generateFinalSuggestions
+  } = useRealTimeAnalysis(debateId, transcriptions);
 
   // Determine if this user is the initiator (sender of the request)
   const isInitiator = debateRequest?.sender_id === user?.id;
@@ -372,6 +393,9 @@ export const UserVsUserDebate = ({ debateId, onEndDebate }: UserVsUserDebateProp
     
     setIsDebating(false);
     
+    // Generate final analysis suggestions
+    await generateFinalSuggestions(transcriptions);
+    
     const myScore = userScores[user.id]?.overallScore || 0;
     const opponentId = user.id === debateRequest.sender_id ? debateRequest.receiver_id : debateRequest.sender_id;
     const opponentScore = userScores[opponentId]?.overallScore || 0;
@@ -381,7 +405,9 @@ export const UserVsUserDebate = ({ debateId, onEndDebate }: UserVsUserDebateProp
     const debateDataJson = JSON.stringify({
       scores: userScores,
       duration: debateTimer,
-      final_scores: { [user.id]: myScore, [opponentId]: opponentScore }
+      final_scores: { [user.id]: myScore, [opponentId]: opponentScore },
+      transcriptions: transcriptions.slice(-10), // Last 10 transcription entries
+      analysis_metrics: metrics
     });
 
     await supabase
@@ -699,10 +725,28 @@ export const UserVsUserDebate = ({ debateId, onEndDebate }: UserVsUserDebateProp
           </div>
         </div>
 
-        {/* Enhanced Real-time Analysis Panel - Mobile Responsive */}
+        {/* Enhanced Real-time Analysis Panel with Transcription - Mobile Responsive */}
         <div className="w-full xl:w-96 bg-black/40 backdrop-blur-lg border-t xl:border-t-0 xl:border-l border-purple-500/20 mobile-spacing-sm overflow-y-auto max-h-[50vh] xl:max-h-none">
-          <h3 className="text-white font-bold mb-4 sm:mb-6 flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 mobile-text-responsive">
-            🧠 AI Analysis Dashboard
+          <div className="space-y-4">
+            {/* Transcription Panel */}
+            <TranscriptionPanel
+              transcriptions={transcriptions}
+              isRecording={isRecording}
+              onStartRecording={startRecording}
+              onStopRecording={stopRecording}
+              isLoading={transcriptionLoading}
+            />
+            
+            {/* Live Analysis Panel */}
+            <LiveAnalysisPanel
+              metrics={metrics}
+              liveFeedback={liveFeedback}
+              isAnalyzing={isAnalyzing}
+            />
+          </div>
+
+          <h3 className="text-white font-bold mb-4 sm:mb-6 flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 mobile-text-responsive mt-6">
+            🧠 Traditional Analysis Dashboard
             <Badge variant="outline" className="border-green-500 text-green-400 animate-pulse w-fit">
               LIVE
             </Badge>

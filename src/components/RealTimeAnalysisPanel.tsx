@@ -157,13 +157,11 @@ export const RealTimeAnalysisPanel = ({ isActive, onTranscriptUpdate, transcript
           <div>
             <div className="flex justify-between text-xs mb-1">
               <span className="text-slate-300">Emotional Tone</span>
-              <Badge className={
-                metrics.emotionalTone === 'positive' ? 'bg-green-600' :
-                metrics.emotionalTone === 'negative' ? 'bg-red-600' : 'bg-gray-600'
-              }>
-                {metrics.emotionalTone}
-              </Badge>
+              <span className={`${getScoreColor(metrics.emotionalTone)} font-medium`}>
+                {metrics.emotionalTone}%
+              </span>
             </div>
+            <Progress value={metrics.emotionalTone} className={`h-2 ${getProgressColor(metrics.emotionalTone)}`} />
           </div>
         </CardContent>
       </Card>

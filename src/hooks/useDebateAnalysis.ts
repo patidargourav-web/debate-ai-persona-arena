@@ -3,7 +3,7 @@ import { useState, useCallback } from 'react';
 
 interface DebateMetrics {
   argumentStrength: number;
-  emotionalTone: 'positive' | 'negative' | 'neutral';
+  emotionalTone: number;
   engagement: number;
   structure: {
     hasOpening: boolean;
@@ -17,7 +17,7 @@ interface DebateMetrics {
 export const useDebateAnalysis = () => {
   const [metrics, setMetrics] = useState<DebateMetrics>({
     argumentStrength: 0,
-    emotionalTone: 'neutral',
+    emotionalTone: 75, // Neutral balanced score
     engagement: 0,
     structure: {
       hasOpening: false,
@@ -37,15 +37,19 @@ export const useDebateAnalysis = () => {
     const evidenceCount = words.filter(word => evidenceKeywords.includes(word)).length;
     const argumentStrength = Math.min(100, (evidenceCount / words.length) * 1000 + confidence * 50);
 
-    // Analyze emotional tone
-    const positiveWords = ['good', 'great', 'excellent', 'positive', 'beneficial', 'improve'];
-    const negativeWords = ['bad', 'terrible', 'wrong', 'harmful', 'negative', 'worse'];
+    // Analyze emotional tone (0-100 scale, where 50 is neutral, >50 is positive, <50 is negative)
+    const positiveWords = ['good', 'great', 'excellent', 'positive', 'beneficial', 'improve', 'effective', 'strong'];
+    const negativeWords = ['bad', 'terrible', 'wrong', 'harmful', 'negative', 'worse', 'fail', 'weak'];
     const positiveCount = words.filter(word => positiveWords.includes(word)).length;
     const negativeCount = words.filter(word => negativeWords.includes(word)).length;
     
-    let emotionalTone: 'positive' | 'negative' | 'neutral' = 'neutral';
-    if (positiveCount > negativeCount) emotionalTone = 'positive';
-    else if (negativeCount > positiveCount) emotionalTone = 'negative';
+    // Calculate emotional tone as a score (0-100)
+    const totalEmotionalWords = positiveCount + negativeCount;
+    let emotionalTone = 75; // Default neutral-positive
+    if (totalEmotionalWords > 0) {
+      emotionalTone = Math.round(50 + ((positiveCount - negativeCount) / totalEmotionalWords) * 50);
+      emotionalTone = Math.max(0, Math.min(100, emotionalTone)); // Clamp between 0-100
+    }
 
     // Analyze engagement based on variety and complexity
     const uniqueWords = new Set(words);
@@ -71,7 +75,7 @@ export const useDebateAnalysis = () => {
 
     setMetrics({
       argumentStrength: Math.round(argumentStrength),
-      emotionalTone,
+      emotionalTone: Math.round(emotionalTone),
       engagement: Math.round(engagement),
       structure,
       topicRelevance: Math.round(topicRelevance),
