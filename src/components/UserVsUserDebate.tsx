@@ -11,6 +11,7 @@ import { useTranscription } from '@/hooks/useTranscription';
 import { useRealTimeAnalysis } from '@/hooks/useRealTimeAnalysis';
 import { TranscriptionPanel } from '@/components/TranscriptionPanel';
 import { LiveAnalysisPanel } from '@/components/LiveAnalysisPanel';
+import { NotePad } from '@/components/NotePad';
 import { Mic, MicOff, Video, VideoOff } from 'lucide-react';
 
 interface UserVsUserDebateProps {
@@ -728,6 +729,12 @@ export const UserVsUserDebate = ({ debateId, onEndDebate }: UserVsUserDebateProp
         {/* Enhanced Real-time Analysis Panel with Transcription - Mobile Responsive */}
         <div className="w-full xl:w-96 bg-black/40 backdrop-blur-lg border-t xl:border-t-0 xl:border-l border-purple-500/20 mobile-spacing-sm overflow-y-auto max-h-[50vh] xl:max-h-none">
           <div className="space-y-4">
+            {/* NotePad */}
+            <NotePad 
+              debateId={debateId}
+              className="bg-slate-800/50 border-slate-600/50 backdrop-blur-sm"
+            />
+            
             {/* Transcription Panel */}
             <TranscriptionPanel
               transcriptions={transcriptions}
